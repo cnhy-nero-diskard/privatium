@@ -1,0 +1,35 @@
+/* Custom theme color variables */
+:root {
+  /* Light theme (default) */
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Theme-specific colors */
+  --card-background: #ffffff;
+  --card-foreground: #171717;
+  --border-color: #e5e7eb;
+  --accent-color: #2563eb;
+  --accent-foreground: #ffffff;
+}
+
+/* Dark theme */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card-background: #1f1f1f;
+  --card-foreground: #ededed;
+  --border-color: #2d2d2d;
+  --accent-color: #3b82f6;
+  --accent-foreground: #ffffff;
+}
+
+/* Blue theme */
+.blue {
+  --background: #0c4a6e;
+  --foreground: #f0f9ff;
+  --card-background: #075985;
+  --card-foreground: #f0f9ff;
+  --border-color: #0284c7;
+  --accent-color: #0ea5e9;
+  --accent-foreground: #ffffff;
+}
