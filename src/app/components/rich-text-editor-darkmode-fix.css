@@ -1,0 +1,43 @@
+/* Additional styles to ensure dark mode works properly with the rich text editor */
+.dark .editor-content,
+[data-theme="dark"] .editor-content,
+.rich-editor-container.dark .editor-content {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+  color: #e5e7eb !important;
+}
+
+.dark .editor-content [data-slate-editor] *,
+[data-theme="dark"] .editor-content [data-slate-editor] *,
+.rich-editor-container.dark .editor-content [data-slate-editor] * {
+  color: #e5e7eb !important;
+}
+
+.dark .editor-content [data-slate-editor] a,
+[data-theme="dark"] .editor-content [data-slate-editor] a,
+.rich-editor-container.dark .editor-content [data-slate-editor] a {
+  color: #60a5fa !important;
+}
+
+/* Ensure code blocks render correctly in dark mode */
+.dark .editor-content [data-slate-node="element"][data-slate-type="code"],
+[data-theme="dark"] .editor-content [data-slate-node="element"][data-slate-type="code"],
+.rich-editor-container.dark .editor-content [data-slate-node="element"][data-slate-type="code"] {
+  background-color: #111827 !important;
+  border-color: #4b5563 !important;
+}
+
+/* Ensure blockquotes render correctly in dark mode */
+.dark .editor-content [data-slate-node="element"][data-slate-type="block-quote"],
+[data-theme="dark"] .editor-content [data-slate-node="element"][data-slate-type="block-quote"],
+.rich-editor-container.dark .editor-content [data-slate-node="element"][data-slate-type="block-quote"] {
+  border-left-color: #4b5563 !important;
+  color: #9ca3af !important;
+}
+
+/* Ensure list items render correctly */
+.dark .editor-content [data-slate-node="element"][data-slate-type="list-item"],
+[data-theme="dark"] .editor-content [data-slate-node="element"][data-slate-type="list-item"],
+.rich-editor-container.dark .editor-content [data-slate-node="element"][data-slate-type="list-item"] {
+  color: #e5e7eb !important;
+}
