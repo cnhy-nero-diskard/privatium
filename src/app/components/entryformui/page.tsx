@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { useTheme } from "next-themes";
 
 const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
 const MOODS = [
@@ -29,7 +28,6 @@ const EntryForm: React.FC = () => {
   const [weather] = useState<string>("☀️ Sunny");
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
-  const { theme, setTheme } = useTheme();
 
   // Geolocation handler
   const handleGetLocation = () => {

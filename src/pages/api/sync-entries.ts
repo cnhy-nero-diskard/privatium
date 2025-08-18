@@ -1,18 +1,15 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { readCSVFromWebDAV } from "@/utils/webdavCSV";
+import { getJournals } from "@/utils/supabaseClient";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
   try {
-    const filePath = process.env.KOONAME;
-    if (!filePath) {
-      return res.status(500).json({ error: "CSV file path is not defined in environment variables" });
-    }
-    const data = await readCSVFromWebDAV(filePath);
-    res.status(200).json({ entries: data.slice(0, 20) });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch CSV" });
+    const data = await getJournals();
+    res.status(200).json({ entries: data });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to fetch journals from Supabase";
+    res.status(500).json({ error: errorMessage });
   }
 }
