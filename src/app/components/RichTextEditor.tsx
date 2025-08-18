@@ -152,13 +152,17 @@ export const RichTextEditor = ({ value, onChange }: RichTextEditorProps) => {
             autoFocus
             onDOMBeforeInput={handleDOMBeforeInput}
             onKeyDown={event => {
+              let handled = false;
               for (const hotkey in HOTKEYS) {
                 if (isHotkey(hotkey, event)) {
                   event.preventDefault();
                   const mark = HOTKEYS[hotkey];
                   toggleMark(editor, mark);
+                  handled = true;
+                  break;
                 }
               }
+              // Only prevent default for hotkeys, not for other keys like Backspace
             }}
             className="p-4 min-h-[250px] focus:outline-none rounded-lg text-gray-900 dark:text-gray-100 transition-colors duration-200"
           />
