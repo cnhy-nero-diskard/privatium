@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 import { useRouter } from "next/navigation";
 import { createJournal } from "@/utils/supabaseClient";
 
@@ -18,6 +19,9 @@ function formatDate(date: Date): string {
 }
 
 const EntryForm: React.FC = () => {
+  // ...existing code...
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const today = new Date();
   const [date, setDate] = useState<string>(formatDate(today));
   const [title, setTitle] = useState<string>("");
@@ -30,6 +34,8 @@ const EntryForm: React.FC = () => {
   const [weather] = useState<string>("☀️ Sunny");
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  // Progress calculation (after state declarations)
+  const progress = [title, text, folder, mood].filter(Boolean).length / 4 * 100;
 
   // Geolocation handler
   const handleGetLocation = () => {
@@ -70,27 +76,40 @@ const EntryForm: React.FC = () => {
   // Submit handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setSaving(true);
+    setSaved(false);
     try {
-      // Create the journal entry
       await createJournal({
         date,
         title,
-        content: text, // Save the text content to the content field
+        content: text,
         folder,
         mood: mood || ''
       });
-
-      // Navigate back to the main page
-      router.push('/');
-      router.refresh(); // Refresh the page to show the new entry
+      setSaved(true);
+      setTimeout(() => {
+        setSaved(false);
+        router.push('/');
+        router.refresh();
+      }, 1200);
     } catch (error) {
-      console.error('Error saving entry:', error);
+      setSaving(false);
       alert('Failed to save entry. Please try again.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center py-8 px-2">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center py-8 px-2">
+      {/* Header */}
+      <div className="absolute top-0 left-0 w-full flex flex-col items-center pt-8 pb-2 z-10">
+        <div className="flex items-center gap-3">
+          <span className="text-4xl">📝</span>
+          <h1 className="text-3xl font-extrabold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent drop-shadow">New Journal Entry</h1>
+        </div>
+        <div className="w-64 h-2 mt-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-full transition-all duration-500" style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#3b82f6,#a78bfa,#ec4899)' }} />
+        </div>
+      </div>
       {/* Help Modal */}
       {helpOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -130,12 +149,13 @@ const EntryForm: React.FC = () => {
       </button>
       <form
         onSubmit={handleSubmit}
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-8 p-8"
+        className="bg-white/80 dark:bg-gray-800/90 rounded-2xl shadow-2xl w-full max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-8 p-8 mt-24 animate-fadein"
         aria-label="Journal Entry Form"
+        style={{ backdropFilter: 'blur(8px)' }}
       >
         {/* Top Bar: Date */}
         <div className="md:col-span-2 flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-white/60 dark:bg-gray-700/60 rounded-lg px-3 py-2 shadow">
             <span className="text-gray-500 dark:text-gray-400">Today:</span>
             <input
               type="date"
@@ -149,7 +169,7 @@ const EntryForm: React.FC = () => {
           </div>
         </div>
         {/* Title */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 bg-white/60 dark:bg-gray-700/60 rounded-lg px-4 py-3 shadow transition-transform hover:scale-[1.02]">
           <label htmlFor="title" className="font-medium text-gray-700 dark:text-gray-200">
             Title
           </label>
@@ -165,7 +185,7 @@ const EntryForm: React.FC = () => {
           />
         </div>
         {/* Folder */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 bg-white/60 dark:bg-gray-700/60 rounded-lg px-4 py-3 shadow transition-transform hover:scale-[1.02]">
           <label htmlFor="folder" className="font-medium text-gray-700 dark:text-gray-200">
             Folder
           </label>
@@ -181,37 +201,45 @@ const EntryForm: React.FC = () => {
             ))}
           </select>
         </div>
-        {/* Text */}
-        <div className="flex flex-col gap-1 md:col-span-2">
-          <label htmlFor="text" className="font-medium text-gray-700 dark:text-gray-200">
-            Text
-          </label>
-          <textarea
-            id="text"
-            name="text"
-            rows={6}
-            placeholder="Write your entry in Markdown…"
-            className="border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:border-gray-600 resize-vertical"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            required
-          />
+        {/* Text & Markdown Preview */}
+        <div className="flex flex-col md:flex-row gap-4 md:col-span-2">
+          <div className="flex-1 flex flex-col gap-1 bg-white/60 dark:bg-gray-700/60 rounded-lg px-4 py-3 shadow transition-transform hover:scale-[1.02]">
+            <label htmlFor="text" className="font-medium text-gray-700 dark:text-gray-200">
+              Text
+            </label>
+            <textarea
+              id="text"
+              name="text"
+              rows={6}
+              placeholder="Write your entry in Markdown…"
+              className="border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:border-gray-600 resize-vertical"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex-1 flex flex-col gap-1 bg-white/60 dark:bg-gray-700/60 rounded-lg px-4 py-3 shadow transition-transform hover:scale-[1.02]">
+            <label className="font-medium text-gray-700 dark:text-gray-200">Live Preview</label>
+            <div className="prose dark:prose-invert max-w-none border rounded px-3 py-2 bg-gray-50 dark:bg-gray-900 min-h-[120px]">
+              <ReactMarkdown>{text || "*Your markdown preview will appear here...*"}</ReactMarkdown>
+            </div>
+          </div>
         </div>
         {/* Tags */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 bg-white/60 dark:bg-gray-700/60 rounded-lg px-4 py-3 shadow transition-transform hover:scale-[1.02]">
           <label htmlFor="tags" className="font-medium text-gray-700 dark:text-gray-200">
             Tags
           </label>
           <div className="flex flex-wrap gap-2 mb-1">
-            {tags.map((tag) => (
+            {tags.map((tag, i) => (
               <span
                 key={tag}
-                className="inline-flex items-center bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 rounded-full px-3 py-1 text-sm mr-1"
+                className={`inline-flex items-center rounded-full px-3 py-1 text-sm mr-1 shadow ${i%2===0?'bg-pink-100 text-pink-700 dark:bg-pink-800 dark:text-pink-200':'bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-200'}`}
               >
                 {tag}
                 <button
                   type="button"
-                  className="ml-2 text-blue-400 hover:text-blue-700 dark:hover:text-white focus:outline-none"
+                  className="ml-2 text-gray-400 hover:text-red-500 dark:hover:text-white focus:outline-none"
                   aria-label={`Remove tag ${tag}`}
                   onClick={() => removeTag(tag)}
                 >
@@ -231,18 +259,19 @@ const EntryForm: React.FC = () => {
               aria-label="Add tag"
             />
           </div>
+          <div className="text-xs text-gray-400 mt-1">Press Enter or comma to add. Backspace to remove last.</div>
         </div>
         {/* Mood */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 bg-white/60 dark:bg-gray-700/60 rounded-lg px-4 py-3 shadow transition-transform hover:scale-[1.02]">
           <label className="font-medium text-gray-700 dark:text-gray-200">Mood</label>
           <div className="flex gap-2 mt-1" role="group" aria-label="Mood selector">
             {MOODS.map((m) => (
               <button
                 key={m.emoji}
                 type="button"
-                className={`text-2xl rounded-full p-2 border-2 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors ${
+                className={`text-2xl rounded-full p-2 border-2 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 relative group ${
                   mood === m.emoji
-                    ? "bg-blue-100 dark:bg-blue-800 border-blue-400"
+                    ? "bg-gradient-to-tr from-blue-200 via-purple-200 to-pink-200 dark:from-blue-900 dark:via-purple-900 dark:to-pink-900 border-blue-400 scale-110 shadow-lg"
                     : "bg-transparent border-transparent hover:bg-gray-200 dark:hover:bg-gray-700"
                 }`}
                 aria-pressed={mood === m.emoji}
@@ -251,25 +280,28 @@ const EntryForm: React.FC = () => {
                 onClick={() => setMood(mood === m.emoji ? null : m.emoji)}
               >
                 {m.emoji}
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none bg-black/80 text-white text-xs rounded px-2 py-1 transition-all">{m.label}</span>
               </button>
             ))}
           </div>
         </div>
         {/* Location & Weather */}
-        <div className="flex flex-col gap-1 md:col-span-2">
+        <div className="flex flex-col gap-1 md:col-span-2 bg-white/60 dark:bg-gray-700/60 rounded-lg px-4 py-3 shadow transition-transform hover:scale-[1.02]">
           <label className="font-medium text-gray-700 dark:text-gray-200">Location & Weather</label>
           <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
             <button
               type="button"
-              className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="bg-gradient-to-r from-blue-200 to-purple-200 dark:from-blue-900 dark:to-purple-900 text-gray-700 dark:text-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow"
               onClick={handleGetLocation}
             >
-              Get my location
+              <span className="mr-2">📍</span>Get my location
             </button>
-            <span className="text-gray-600 dark:text-gray-300 min-w-[120px]">
+            <span className="text-gray-600 dark:text-gray-300 min-w-[120px] flex items-center gap-1">
+              <span className="text-lg">🌐</span>
               {location || <span className="italic text-gray-400">No location</span>}
             </span>
             <span className="ml-auto flex items-center gap-1 text-lg">
+              <span>🌤️</span>
               <span>{weather}</span>
             </span>
           </div>
@@ -278,14 +310,21 @@ const EntryForm: React.FC = () => {
         <div className="md:col-span-2 flex justify-end mt-4">
           <button
             type="submit"
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!title.trim() || !text.trim()}
+            className={`bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed relative ${saving ? 'pointer-events-none' : ''}`}
+            disabled={!title.trim() || !text.trim() || saving}
           >
-            Save Entry
+            {saving ? (
+              <span className="animate-spin mr-2 w-5 h-5 border-2 border-white border-t-transparent rounded-full"></span>
+            ) : saved ? (
+              <span className="mr-2">✅</span>
+            ) : (
+              <span className="mr-2">💾</span>
+            )}
+            {saved ? "Saved!" : saving ? "Saving..." : "Save Entry"}
           </button>
         </div>
       </form>
-    </div>
+  </div>
   );
 };
 
