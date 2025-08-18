@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import JournalModal from "./components/JournalModal";
 import Link from "next/link";
