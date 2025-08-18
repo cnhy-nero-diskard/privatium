@@ -1,27 +1,55 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import JournalModal from "./components/JournalModal";
 import Link from "next/link";
 import { getJournals } from "@/utils/supabaseClient";
+
+import { updateJournal, deleteJournal } from "@/utils/supabaseClient";
 
 const HomePage: React.FC = () => {
 	const [entries, setEntries] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
+
+	const fetchEntries = async () => {
+		try {
+			const data = await getJournals();
+			setEntries(data || []);
+		} catch (error) {
+			console.error('Error fetching entries:', error);
+		} finally {
+			setLoading(false);
+		}
+	};
 
 	useEffect(() => {
-		const fetchEntries = async () => {
-			try {
-				const data = await getJournals();
-				setEntries(data || []);
-			} catch (error) {
-				console.error('Error fetching entries:', error);
-			} finally {
-				setLoading(false);
-			}
-		};
-
 		fetchEntries();
 	}, []);
+
+	// Handler for editing an entry
+	const handleEdit = async (updatedEntry: any) => {
+		try {
+			await updateJournal(updatedEntry.id, updatedEntry);
+			await fetchEntries();
+			setSelectedEntry(null);
+		} catch (error) {
+			console.error('Error updating entry:', error);
+			alert('Failed to update entry.');
+		}
+	};
+
+	// Handler for deleting an entry
+	const handleDelete = async (entryId: string) => {
+		try {
+			await deleteJournal(Number(entryId));
+			await fetchEntries();
+			setSelectedEntry(null);
+		} catch (error) {
+			console.error('Error deleting entry:', error);
+			alert('Failed to delete entry.');
+		}
+	};
 
 	return (
 		<main className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center py-10 px-2">
@@ -50,7 +78,8 @@ const HomePage: React.FC = () => {
 						{entries.map((entry) => (
 							<li
 								key={entry.id}
-								className="py-4 flex items-center justify-between"
+								className="py-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+								onClick={() => setSelectedEntry(entry)}
 							>
 								<div>
 									<div className="font-medium text-gray-800 dark:text-gray-100">
@@ -64,6 +93,15 @@ const HomePage: React.FC = () => {
 							</li>
 						))}
 					</ul>
+				)}
+				{/* Modal for entry content */}
+				{selectedEntry && (
+					<JournalModal
+						entry={selectedEntry}
+						onClose={() => setSelectedEntry(null)}
+						onEdit={handleEdit}
+						onDelete={handleDelete}
+					/>
 				)}
 			</div>
 		</main>
