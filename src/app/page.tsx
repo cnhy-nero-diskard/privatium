@@ -1,28 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-
-// Dummy data for previous entries (replace with real data source later)
-const dummyEntries = [
-	{
-		id: 1,
-		date: "2025-07-14",
-		title: "A Productive Day",
-		folder: "Work",
-		mood: "😊",
-	},
-	{
-		id: 2,
-		date: "2025-07-13",
-		title: "Sunday Reflections",
-		folder: "Personal",
-		mood: "😄",
-	},
-];
+import { getJournals } from "@/utils/supabaseClient";
 
 const HomePage: React.FC = () => {
-	const [entries] = useState(dummyEntries);
+	const [entries, setEntries] = useState<any[]>([]);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		const fetchEntries = async () => {
+			try {
+				const data = await getJournals();
+				setEntries(data || []);
+			} catch (error) {
+				console.error('Error fetching entries:', error);
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchEntries();
+	}, []);
 
 	return (
 		<main className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center py-10 px-2">
@@ -40,7 +39,9 @@ const HomePage: React.FC = () => {
 						</button>
 					</Link>
 				</div>
-				{entries.length === 0 ? (
+				{loading ? (
+					<p className="text-gray-500 dark:text-gray-400">Loading entries...</p>
+				) : entries.length === 0 ? (
 					<p className="text-gray-500 dark:text-gray-400 italic">
 						No entries yet. Start by adding a new entry!
 					</p>

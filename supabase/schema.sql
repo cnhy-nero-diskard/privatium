@@ -3,6 +3,7 @@ CREATE TABLE public.journals (
     id SERIAL PRIMARY KEY,
     date DATE NOT NULL,
     title TEXT NOT NULL,
+    content TEXT NOT NULL,
     folder TEXT NOT NULL,
     mood TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),

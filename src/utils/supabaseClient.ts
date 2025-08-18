@@ -36,7 +36,7 @@ export async function getJournalById(id: number) {
   return data;
 }
 
-export async function createJournal(journal: { date: string; title: string; folder: string; mood: string }) {
+export async function createJournal(journal: { date: string; title: string; content: string; folder: string; mood: string }) {
   const supabase = getSupabaseClient();
   
   const { data, error } = await supabase

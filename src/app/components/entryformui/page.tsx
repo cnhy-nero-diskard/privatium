@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { createJournal } from "@/utils/supabaseClient";
 
 const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
 const MOODS = [
@@ -63,20 +65,28 @@ const EntryForm: React.FC = () => {
     setTags(tags.filter((t) => t !== tag));
   };
 
+  const router = useRouter();
+
   // Submit handler
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const entry = {
-      date,
-      title,
-      text,
-      folder,
-      tags,
-      mood,
-      location,
-      weather,
-    };
-    console.log(JSON.stringify(entry, null, 2));
+    try {
+      // Create the journal entry
+      await createJournal({
+        date,
+        title,
+        content: text, // Save the text content to the content field
+        folder,
+        mood: mood || ''
+      });
+
+      // Navigate back to the main page
+      router.push('/');
+      router.refresh(); // Refresh the page to show the new entry
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      alert('Failed to save entry. Please try again.');
+    }
   };
 
   return (
