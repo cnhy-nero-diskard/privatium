@@ -2,9 +2,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, Meh, Frown, Angry, Calendar, Clock } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createJournal } from "@/utils/supabaseClient";
-import { RichTextEditor, initialValue } from "@/app/components/RichTextEditor";
+import { RichTextEditor } from "@/app/components/RichTextEditor";
 import '@/app/components/rich-text-editor.css';
 
 const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
@@ -36,64 +36,36 @@ function getCurrentTime(): string {
 
 import { Descendant } from 'slate';
 
-// Serialize Slate content to string
-function serializeSlate(nodes: Descendant[]): string {
-  return nodes.map(n => serializeNode(n)).join('\n');
-}
-
-function serializeNode(node: any): string {
-  if (node.text !== undefined) {
-    let string = node.text;
-    if (node.bold) string = `**${string}**`;
-    if (node.italic) string = `_${string}_`;
-    if (node.code) string = `\`${string}\``;
-    if (node.underline) string = `<u>${string}</u>`;
-    return string;
-  }
-
-  const children = node.children?.map((n: any) => serializeNode(n)).join('') || '';
-  
-  switch (node.type) {
-    case 'paragraph':
-      return `${children}\n`;
-    case 'heading-one':
-      return `# ${children}\n`;
-    case 'heading-two':
-      return `## ${children}\n`;
-    case 'block-quote':
-      return `> ${children}\n`;
-    case 'numbered-list':
-      return children;
-    case 'bulleted-list':
-      return children;
-    case 'list-item':
-      return `- ${children}\n`;
-    case 'divider':
-      return '---\n';
-    default:
-      return children;
-  }
-}
+// Default value for the rich text editor
+const initialValue: Descendant[] = [
+  {
+    type: 'paragraph',
+    children: [{ text: '' }],
+  },
+];
 
 const EntryForm: React.FC = () => {
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  // Read query params for edit mode
-  const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const isEdit = params?.get('page') === 'edit';
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const isEdit = searchParams?.get('page') === 'edit';
+  
   const today = new Date();
-  const [date, setDate] = useState<string>(isEdit ? params?.get('date') || formatDate(today) : formatDate(today));
+  const [date, setDate] = useState<string>(isEdit && searchParams ? searchParams.get('date') || formatDate(today) : formatDate(today));
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
-  const [title, setTitle] = useState<string>(isEdit ? params?.get('title') || '' : '');
-  const [slateValue, setSlateValue] = useState<Descendant[]>(
-    isEdit && params?.get('content')
-      ? [{ type: 'paragraph', children: [{ text: params.get('content') || '' }] }]
-      : initialValue
-  );
-  const [folder, setFolder] = useState<string>(isEdit ? params?.get('folder') || FOLDER_OPTIONS[0] : FOLDER_OPTIONS[0]);
+  const [title, setTitle] = useState<string>(isEdit && searchParams ? searchParams.get('title') || '' : '');
+  const [slateValue, setSlateValue] = useState<Descendant[]>(() => {
+    if (isEdit && searchParams?.get('content')) {
+      return [{ 
+        type: 'paragraph',
+        children: [{ text: searchParams.get('content') || '' }]
+      }];
+    }
+    return initialValue;
+  });
+  const [folder, setFolder] = useState<string>(isEdit && searchParams ? searchParams.get('folder') || FOLDER_OPTIONS[0] : FOLDER_OPTIONS[0]);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
-  const [mood, setMood] = useState<string | null>(isEdit ? params?.get('mood') || null : null);
+  const [mood, setMood] = useState<string | null>(isEdit && searchParams ? searchParams.get('mood') || null : null);
   const [location, setLocation] = useState<string>("");
   const [weather] = useState<string>("☀️ Sunny");
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
@@ -153,7 +125,9 @@ const EntryForm: React.FC = () => {
       (node.children && node.children.some((child: any) => 
         child.text !== undefined && child.text.trim() !== ''))
     );
-  };  // Progress calculation (after state declarations)
+  };
+
+  // Progress calculation
   const progress = [title, hasContent() ? 1 : 0, folder, mood].filter(Boolean).length / 4 * 100;
 
   // Geolocation handler
@@ -165,8 +139,6 @@ const EntryForm: React.FC = () => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
-        // Use a free reverse geocoding API (stubbed for privacy)
-        // In real app, fetch city/state from API
         setLocation(`Lat: ${latitude.toFixed(2)}, Lon: ${longitude.toFixed(2)}`);
       },
       () => setLocation("Unable to retrieve location")
@@ -190,22 +162,17 @@ const EntryForm: React.FC = () => {
     setTags(tags.filter((t) => t !== tag));
   };
 
-  const router = useRouter();
-
   // Submit handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
     
-    // Convert Slate value to text for storage
-    const contentText = serializeSlate(slateValue);
-    
     try {
       await createJournal({
         date,
         title,
-        content: contentText,
+        content: JSON.stringify(slateValue),
         folder,
         mood: mood || ''
       });
@@ -223,6 +190,8 @@ const EntryForm: React.FC = () => {
 
   // Detect dark mode
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   
   // Check for dark mode on client-side
   useEffect(() => {

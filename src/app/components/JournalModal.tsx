@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { useRouter } from 'next/navigation';
 import { FaRegSmile, FaRegFrown, FaRegMeh, FaRegCopy, FaEdit, FaTrash } from "react-icons/fa";
 
 interface JournalModalProps {
@@ -17,17 +18,18 @@ const moodIcon = (mood: string) => {
   }
 };
 
-const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onEdit, onDelete }) => {
+const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete }) => {
   const contentRef = useRef<HTMLDivElement>(null);
-  const [isEditing, setIsEditing] = React.useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
-  const [editData, setEditData] = React.useState(entry);
   const modalRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
   React.useEffect(() => {
     if (modalRef.current) {
       modalRef.current.focus();
     }
   }, []);
+
   if (!entry) return null;
 
   const handleCopy = () => {
@@ -37,17 +39,16 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onEdit, onD
   };
 
   const handleEditClick = () => {
-    setEditData(entry);
-    setIsEditing(true);
-  };
-
-  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setEditData({ ...editData, [e.target.name]: e.target.value });
-  };
-
-  const handleEditSave = () => {
-    if (onEdit) onEdit(editData);
-    setIsEditing(false);
+    // Redirect to entryformui with entry data
+    const params = new URLSearchParams({
+      title: entry.title || '',
+      date: entry.date || '',
+      folder: entry.folder || '',
+      mood: entry.mood || '',
+      content: entry.content || ''
+    });
+    // Use Next.js router for client-side navigation
+    router.push(`/entryformui?page=edit&${params.toString()}`);
   };
 
   const handleDeleteClick = () => {
@@ -80,82 +81,50 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onEdit, onD
         >
           ×
         </button>
-        {isEditing ? (
-          <>
-            <input
-              type="text"
-              name="title"
-              value={editData.title}
-              onChange={handleEditChange}
-              className="font-extrabold mb-2 text-blue-700 dark:text-blue-300 text-2xl sm:text-3xl font-journal tracking-wide w-full p-2 rounded-lg border border-blue-200 dark:border-blue-700 mb-2"
-              maxLength={100}
-              placeholder="Title..."
-            />
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
-              <input type="text" name="date" value={editData.date} onChange={handleEditChange} className="px-2 py-0.5 rounded-full border w-24" />
-              <input type="text" name="folder" value={editData.folder} onChange={handleEditChange} className="px-2 py-0.5 rounded-full border w-24" />
-              <input type="text" name="mood" value={editData.mood} onChange={handleEditChange} className="px-2 py-0.5 rounded-full border w-24" />
+        <>
+          <h2 className="font-extrabold mb-2 text-blue-700 dark:text-blue-300 text-2xl sm:text-3xl font-journal tracking-wide break-words max-w-full" title={entry.title}>
+            {entry.title?.length ? entry.title : <span className="italic text-gray-400">No Title</span>}
+          </h2>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
+            <span>{entry.date}</span>
+            <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-700">{entry.folder || <span className="italic text-gray-400">No Folder</span>}</span>
+            <span className="flex items-center gap-1 font-semibold">Mood: {moodIcon(entry.mood)}<span className="text-base">{entry.mood || <span className="italic text-gray-400">None</span>}</span></span>
+          </div>
+          <div ref={contentRef} className="prose dark:prose-invert min-h-[120px] max-h-[320px] sm:max-h-[400px] overflow-y-auto text-base text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-800 mb-4 break-words">
+            {entry.content?.length ? entry.content : <span className="italic text-gray-400">No content available.</span>}
+          </div>
+          <div className="flex justify-between items-center mt-2 gap-2 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                className="p-2 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 border border-blue-200 dark:border-blue-700 text-lg shadow-sm min-w-[40px]"
+                onClick={handleCopy}
+                aria-label="Copy journal content"
+                title="Copy"
+              >
+                <FaRegCopy />
+              </button>
+              <button
+                className="p-2 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 border border-green-200 dark:border-green-700 text-lg shadow-sm min-w-[40px]"
+                onClick={handleEditClick}
+                aria-label="Edit journal entry"
+                title="Edit"
+              >
+                <FaEdit />
+              </button>
+              <button
+                className="p-2 rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 border border-red-200 dark:border-red-700 text-lg shadow-sm min-w-[40px]"
+                onClick={handleDeleteClick}
+                aria-label="Delete journal entry"
+                title="Delete"
+              >
+                <FaTrash />
+              </button>
             </div>
-            <textarea
-              name="content"
-              value={editData.content}
-              onChange={handleEditChange}
-              className="prose dark:prose-invert min-h-[120px] max-h-[320px] sm:max-h-[400px] overflow-y-auto text-base text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-800 mb-4 w-full"
-              rows={6}
-              maxLength={2000}
-              placeholder="Write your journal entry..."
-            />
-            <div className="flex gap-2 mt-2 flex-wrap">
-              <button className="px-4 py-1 rounded-lg bg-blue-600 text-white font-semibold min-w-[80px]" onClick={handleEditSave}>Save</button>
-              <button className="px-4 py-1 rounded-lg bg-gray-300 text-gray-700 font-semibold min-w-[80px]" onClick={() => setIsEditing(false)}>Cancel</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <h2 className="font-extrabold mb-2 text-blue-700 dark:text-blue-300 text-2xl sm:text-3xl font-journal tracking-wide break-words max-w-full" title={entry.title}>
-              {entry.title?.length ? entry.title : <span className="italic text-gray-400">No Title</span>}
-            </h2>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
-              <span>{entry.date}</span>
-              <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-700">{entry.folder || <span className="italic text-gray-400">No Folder</span>}</span>
-              <span className="flex items-center gap-1 font-semibold">Mood: {moodIcon(entry.mood)}<span className="text-base">{entry.mood || <span className="italic text-gray-400">None</span>}</span></span>
-            </div>
-            <div ref={contentRef} className="prose dark:prose-invert min-h-[120px] max-h-[320px] sm:max-h-[400px] overflow-y-auto text-base text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-800 mb-4 break-words">
-              {entry.content?.length ? entry.content : <span className="italic text-gray-400">No content available.</span>}
-            </div>
-            <div className="flex justify-between items-center mt-2 gap-2 flex-wrap">
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  className="p-2 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 border border-blue-200 dark:border-blue-700 text-lg shadow-sm min-w-[40px]"
-                  onClick={handleCopy}
-                  aria-label="Copy journal content"
-                  title="Copy"
-                >
-                  <FaRegCopy />
-                </button>
-                <button
-                  className="p-2 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 border border-green-200 dark:border-green-700 text-lg shadow-sm min-w-[40px]"
-                  onClick={handleEditClick}
-                  aria-label="Edit journal entry"
-                  title="Edit"
-                >
-                  <FaEdit />
-                </button>
-                <button
-                  className="p-2 rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 border border-red-200 dark:border-red-700 text-lg shadow-sm min-w-[40px]"
-                  onClick={handleDeleteClick}
-                  aria-label="Delete journal entry"
-                  title="Delete"
-                >
-                  <FaTrash />
-                </button>
-              </div>
-              {entry.lastEdited && (
-                <span className="text-xs text-gray-400">Last edited: {entry.lastEdited}</span>
-              )}
-            </div>
-          </>
-        )}
+            {entry.lastEdited && (
+              <span className="text-xs text-gray-400">Last edited: {entry.lastEdited}</span>
+            )}
+          </div>
+        </>
         {showDeleteConfirm && (
           <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60">
             <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl border border-red-300 dark:border-red-700 min-w-[260px] max-w-[90vw]">
