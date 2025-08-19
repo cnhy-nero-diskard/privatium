@@ -3,9 +3,8 @@ import React, { useState, useEffect } from "react";
 import JournalModal from "./components/JournalModal";
 import Link from "next/link";
 import TopNavigation from "./components/TopNavigation";
-import { getJournals } from "@/utils/supabaseClient";
-
-import { updateJournal, deleteJournal } from "@/utils/supabaseClient";
+import { getJournals, updateJournal, deleteJournal } from "@/utils/supabaseClient";
+import ConfirmDeleteModal from "./components/ConfirmDeleteModal";
 
 const HomePage: React.FC = () => {
 	const [entries, setEntries] = useState<any[]>([]);
@@ -15,6 +14,8 @@ const HomePage: React.FC = () => {
 	const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 	const [multiSelectMode, setMultiSelectMode] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<number[]>([]);
+	const [showDeleteModal, setShowDeleteModal] = useState(false);
+	const [deleteType, setDeleteType] = useState<'single' | 'multi'>('single');
 
 	const fetchEntries = async () => {
 		try {
@@ -43,30 +44,45 @@ const HomePage: React.FC = () => {
 		}
 	};
 
-	// Handler for deleting an entry
-	const handleDelete = async (entryId: string) => {
-		try {
-			await deleteJournal(Number(entryId));
-			await fetchEntries();
-			setSelectedEntry(null);
-		} catch (error) {
-			console.error('Error deleting entry:', error);
-			alert('Failed to delete entry.');
-		}
+	// Show confirm modal before deleting single entry
+	const handleDeleteRequest = () => {
+		setDeleteType('single');
+		setShowDeleteModal(true);
 	};
 
-	// Multi-delete handler
-	const handleMultiDelete = async () => {
-		if (selectedIds.length === 0) return;
-		try {
-			await Promise.all(selectedIds.map(id => deleteJournal(id)));
-			setSelectedIds([]);
-			setMultiSelectMode(false);
-			await fetchEntries();
-		} catch (error) {
-			console.error('Error deleting entries:', error);
-			alert('Failed to delete selected entries.');
+	// Show confirm modal before multi-delete
+	const handleMultiDeleteRequest = () => {
+		setDeleteType('multi');
+		setShowDeleteModal(true);
+	};
+
+	// Confirm delete for single or multiple entries
+	const handleDeleteConfirm = async () => {
+		if (deleteType === 'single' && selectedEntry) {
+			try {
+				await deleteJournal(Number(selectedEntry.id));
+				await fetchEntries();
+				setSelectedEntry(null);
+			} catch (error) {
+				console.error('Error deleting entry:', error);
+				alert('Failed to delete entry.');
+			}
+		} else if (deleteType === 'multi' && selectedIds.length > 0) {
+			try {
+				await Promise.all(selectedIds.map(id => deleteJournal(id)));
+				setSelectedIds([]);
+				setMultiSelectMode(false);
+				await fetchEntries();
+			} catch (error) {
+				console.error('Error deleting entries:', error);
+				alert('Failed to delete selected entries.');
+			}
 		}
+		setShowDeleteModal(false);
+	};
+
+	const handleDeleteCancel = () => {
+		setShowDeleteModal(false);
 	};
 
 	// Toggle selection for an entry
@@ -195,7 +211,7 @@ const HomePage: React.FC = () => {
 										className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold shadow-lg flex items-center gap-2"
 										type="button"
 										disabled={selectedIds.length === 0}
-										onClick={handleMultiDelete}
+										onClick={handleMultiDeleteRequest}
 										title="Delete Selected"
 									>
 										<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -264,9 +280,18 @@ const HomePage: React.FC = () => {
 							entry={selectedEntry}
 							onClose={() => setSelectedEntry(null)}
 							onEdit={handleEdit}
-							onDelete={handleDelete}
+							onDelete={handleDeleteRequest}
 						/>
 					)}
+
+					{/* Confirm Delete Modal */}
+					<ConfirmDeleteModal
+						open={showDeleteModal}
+						onConfirm={handleDeleteConfirm}
+						onCancel={handleDeleteCancel}
+						multiple={deleteType === 'multi'}
+						count={deleteType === 'multi' ? selectedIds.length : undefined}
+					/>
 				</div>
 			</div>
 		</main>
