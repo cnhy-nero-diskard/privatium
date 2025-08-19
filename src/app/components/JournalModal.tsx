@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { useRouter } from 'next/navigation';
-import { FaRegSmile, FaRegFrown, FaRegMeh, FaRegCopy, FaEdit, FaTrash } from "react-icons/fa";
+import { FaRegCopy, FaEdit, FaTrash } from "react-icons/fa";
+import { MoodWithLabel } from "./MoodIcon";
 
 interface JournalModalProps {
   entry: any;
@@ -8,15 +9,6 @@ interface JournalModalProps {
   onEdit?: (updatedEntry: any) => void;
   onDelete?: (entryId: string) => void;
 }
-
-const moodIcon = (mood: string) => {
-  switch (mood?.toLowerCase()) {
-    case "happy": return <FaRegSmile className="inline text-yellow-400 mr-1" title="Happy" />;
-    case "sad": return <FaRegFrown className="inline text-blue-400 mr-1" title="Sad" />;
-    case "neutral": return <FaRegMeh className="inline text-gray-400 mr-1" title="Neutral" />;
-    default: return <FaRegSmile className="inline text-yellow-300 mr-1" title={mood} />;
-  }
-};
 
 const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete }) => {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -39,8 +31,10 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
   };
 
   const handleEditClick = () => {
-    // Redirect to entryformui with entry data
+    // Redirect to entryformui with entry data including ID
     const params = new URLSearchParams({
+      page: 'edit',
+      id: entry.id.toString(),
       title: entry.title || '',
       date: entry.date || '',
       folder: entry.folder || '',
@@ -48,7 +42,7 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
       content: entry.content || ''
     });
     // Use Next.js router for client-side navigation
-    router.push(`/entryformui?page=edit&${params.toString()}`);
+    router.push(`/entryformui?${params.toString()}`);
   };
 
   const handleDeleteClick = () => {
@@ -88,7 +82,9 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
             <span>{entry.date}</span>
             <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-700">{entry.folder || <span className="italic text-gray-400">No Folder</span>}</span>
-            <span className="flex items-center gap-1 font-semibold">Mood: {moodIcon(entry.mood)}<span className="text-base">{entry.mood || <span className="italic text-gray-400">None</span>}</span></span>
+            <span className="flex items-center gap-1 font-semibold">
+              Mood: <MoodWithLabel mood={entry.mood} />
+            </span>
           </div>
           <div ref={contentRef} className="prose dark:prose-invert min-h-[120px] max-h-[320px] sm:max-h-[400px] overflow-y-auto text-base text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-800 mb-4 break-words">
             {entry.content?.length ? entry.content : <span className="italic text-gray-400">No content available.</span>}

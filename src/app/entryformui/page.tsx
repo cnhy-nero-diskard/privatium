@@ -3,18 +3,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, Meh, Frown, Angry, Calendar, Clock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createJournal } from "@/utils/supabaseClient";
+import { createJournal, updateJournal } from "@/utils/supabaseClient";
 import { RichTextEditor } from "@/app/components/RichTextEditor";
+import { getAllMoods, getMoodDefinition } from "@/utils/moodUtils";
+import { logMoodSelection, logSaveAttempt } from "@/utils/debugMood";
 import '@/app/components/rich-text-editor.css';
 
 const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
-const MOODS = [
-  { icon: Smile, label: "Very Happy" },
-  { icon: Smile, label: "Happy" },
-  { icon: Meh, label: "Neutral" },
-  { icon: Frown, label: "Sad" },
-  { icon: Angry, label: "Angry" },
-];
 
 function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
@@ -48,6 +43,7 @@ const EntryForm: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isEdit = searchParams?.get('page') === 'edit';
+  const editId = searchParams?.get('id');
   
   const today = new Date();
   const [date, setDate] = useState<string>(isEdit && searchParams ? searchParams.get('date') || formatDate(today) : formatDate(today));
@@ -169,13 +165,27 @@ const EntryForm: React.FC = () => {
     setSaved(false);
     
     try {
-      await createJournal({
+      const journalData = {
         date,
         title,
         content: JSON.stringify(slateValue),
         folder,
         mood: mood || ''
-      });
+      };
+
+      // Debug logging
+      logSaveAttempt(journalData);
+
+      if (isEdit && editId) {
+        // Update existing entry
+        console.log('Updating entry with ID:', editId);
+        await updateJournal(parseInt(editId), journalData);
+      } else {
+        // Create new entry
+        console.log('Creating new entry');
+        await createJournal(journalData);
+      }
+      
       setSaved(true);
       setTimeout(() => {
         setSaved(false);
@@ -183,6 +193,7 @@ const EntryForm: React.FC = () => {
         router.refresh();
       }, 1200);
     } catch (error) {
+      console.error('Save error:', error);
       setSaving(false);
       alert('Failed to save entry. Please try again.');
     }
@@ -399,24 +410,29 @@ const EntryForm: React.FC = () => {
                 Select Mood
               </label>
               <div className="flex items-center gap-2" role="group" aria-label="Mood selector">
-                {MOODS.map((m) => {
-                  const Icon = m.icon;
+                {getAllMoods().map((moodDef) => {
                   return (
                     <button
-                      key={m.label}
+                      key={moodDef.id}
                       type="button"
-                      className={`rounded-full p-1.5 border focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 relative group ${
-                        mood === m.label
+                      className={`rounded-full p-2 border focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 relative group ${
+                        mood === moodDef.label
                           ? "bg-blue-100 dark:bg-blue-900 border-blue-400"
                           : "bg-transparent border-transparent hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
-                      aria-pressed={mood === m.label}
-                      aria-label={m.label}
+                      aria-pressed={mood === moodDef.label}
+                      aria-label={moodDef.label}
                       tabIndex={0}
-                      onClick={() => setMood(mood === m.label ? null : m.label)}
+                      onClick={() => {
+                        const newMood = mood === moodDef.label ? null : moodDef.label;
+                        setMood(newMood);
+                        logMoodSelection(newMood);
+                      }}
                     >
-                      <Icon className="w-5 h-5" />
-                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none bg-black/80 text-white text-xs rounded px-2 py-1 transition-all">{m.label}</span>
+                      <span className="text-lg">{moodDef.emoji}</span>
+                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none bg-black/80 text-white text-xs rounded px-2 py-1 transition-all whitespace-nowrap">
+                        {moodDef.label}
+                      </span>
                     </button>
                   );
                 })}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import TopNavigation from "./components/TopNavigation";
 import { getJournals, updateJournal, deleteJournal } from "@/utils/supabaseClient";
 import ConfirmDeleteModal from "./components/ConfirmDeleteModal";
+import { MoodIcon } from "./components/MoodIcon";
 
 const HomePage: React.FC = () => {
 	const [entries, setEntries] = useState<any[]>([]);
@@ -263,9 +264,9 @@ const HomePage: React.FC = () => {
 														</span>
 													</div>
 												</div>
-												<span className="text-2xl ml-4 bg-gray-900/50 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-700/50">
-													{entry.mood}
-												</span>
+												<div className="text-2xl ml-4 bg-gray-900/50 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-700/50 flex items-center justify-center">
+													<MoodIcon mood={entry.mood} size="lg" />
+												</div>
 											</div>
 										</div>
 									))}

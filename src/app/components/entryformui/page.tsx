@@ -5,16 +5,10 @@ import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, Meh, Fr
 import { useRouter } from "next/navigation";
 import { createJournal } from "@/utils/supabaseClient";
 import { RichTextEditor, initialValue } from "@/app/components/RichTextEditor";
+import { getAllMoods, getMoodDefinition } from "@/utils/moodUtils";
 import '@/app/components/rich-text-editor.css';
 
 const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
-const MOODS = [
-  { icon: Smile, label: "Very Happy" },
-  { icon: Smile, label: "Happy" },
-  { icon: Meh, label: "Neutral" },
-  { icon: Frown, label: "Sad" },
-  { icon: Angry, label: "Angry" },
-];
 
 function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
@@ -430,24 +424,25 @@ const EntryForm: React.FC = () => {
                 Select Mood
               </label>
               <div className="flex items-center gap-2" role="group" aria-label="Mood selector">
-                {MOODS.map((m) => {
-                  const Icon = m.icon;
+                {getAllMoods().map((moodDef) => {
                   return (
                     <button
-                      key={m.label}
+                      key={moodDef.id}
                       type="button"
-                      className={`rounded-full p-1.5 border focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 relative group ${
-                        mood === m.label
+                      className={`rounded-full p-2 border focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 relative group ${
+                        mood === moodDef.label
                           ? "bg-blue-100 dark:bg-blue-900 border-blue-400"
                           : "bg-transparent border-transparent hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
-                      aria-pressed={mood === m.label}
-                      aria-label={m.label}
+                      aria-pressed={mood === moodDef.label}
+                      aria-label={moodDef.label}
                       tabIndex={0}
-                      onClick={() => setMood(mood === m.label ? null : m.label)}
+                      onClick={() => setMood(mood === moodDef.label ? null : moodDef.label)}
                     >
-                      <Icon className="w-5 h-5" />
-                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none bg-black/80 text-white text-xs rounded px-2 py-1 transition-all">{m.label}</span>
+                      <span className="text-lg">{moodDef.emoji}</span>
+                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none bg-black/80 text-white text-xs rounded px-2 py-1 transition-all whitespace-nowrap">
+                        {moodDef.label}
+                      </span>
                     </button>
                   );
                 })}

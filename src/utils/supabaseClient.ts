@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { decrypt, encrypt, isEncryptedData, type EncryptedData } from './encryption';
+import { encodeMoodForDb, decodeMoodFromDb } from './moodUtils';
 
 interface JournalEntry {
   id?: number;
@@ -12,9 +13,10 @@ interface JournalEntry {
   updated_at?: string;
 }
 
-interface EncryptedJournalEntry extends Omit<JournalEntry, 'title' | 'content'> {
-  title: string | EncryptedData;
-  content: string | EncryptedData;
+interface EncryptedJournalEntry extends Omit<JournalEntry, 'title' | 'content' | 'mood'> {
+  title: string; // JSON stringified EncryptedData
+  content: string; // JSON stringified EncryptedData  
+  mood: string; // JSON stringified EncryptedData or plain string
 }
 
 function getEncryptionKey(): string {
@@ -38,15 +40,18 @@ export function getSupabaseClient() {
 
 async function encryptJournalData(journal: JournalEntry): Promise<EncryptedJournalEntry> {
   const key = getEncryptionKey();
-  const [encryptedTitle, encryptedContent] = await Promise.all([
+  const [encryptedTitle, encryptedContent, encryptedMood] = await Promise.all([
     encrypt(journal.title, key),
-    encrypt(journal.content, key)
+    encrypt(journal.content, key),
+    encodeMoodForDb(journal.mood, key)
   ]);
   
+  // Ensure all data is properly serialized for database storage
   return {
     ...journal,
-    title: encryptedTitle,
-    content: encryptedContent
+    title: JSON.stringify(encryptedTitle),
+    content: JSON.stringify(encryptedContent),
+    mood: typeof encryptedMood === 'object' ? JSON.stringify(encryptedMood) : encryptedMood
   };
 }
 
@@ -54,36 +59,34 @@ async function decryptJournalData(journal: EncryptedJournalEntry): Promise<Journ
   const key = getEncryptionKey();
   
   // Helper function to parse and decrypt data
-  const decryptField = async (field: string | EncryptedData): Promise<string> => {
-    if (typeof field === 'string') {
-      try {
-        // Try to parse the string as JSON in case it's a stringified EncryptedData
-        const parsed = JSON.parse(field);
-        if (isEncryptedData(parsed)) {
-          return await decrypt(parsed, key);
-        }
-      } catch {
-        // If parsing fails, return the original string
-        return field;
+  const decryptField = async (field: string): Promise<string> => {
+    if (!field) return '';
+    
+    try {
+      // Try to parse the string as JSON (new format)
+      const parsed = JSON.parse(field);
+      if (isEncryptedData(parsed)) {
+        return await decrypt(parsed, key);
       }
+      // If it's not encrypted data but valid JSON, return as is
+      return field;
+    } catch {
+      // If parsing fails, it might be plain text (legacy)
+      return field;
     }
-    // If it's already an EncryptedData object, decrypt it
-    if (isEncryptedData(field)) {
-      return await decrypt(field, key);
-    }
-    // Default case: return the field as is
-    return field as string;
   };
 
-  const [title, content] = await Promise.all([
+  const [title, content, mood] = await Promise.all([
     decryptField(journal.title),
-    decryptField(journal.content)
+    decryptField(journal.content),
+    decodeMoodFromDb(journal.mood, key)
   ]);
   
   return {
     ...journal,
     title,
-    content
+    content,
+    mood: mood || ''
   };
 }
 
@@ -119,22 +122,34 @@ export async function getJournalById(id: number) {
 }
 
 export async function createJournal(journal: JournalEntry) {
+  console.log('Creating journal with mood:', journal.mood);
   const supabase = getSupabaseClient();
-  const encryptedJournal = await encryptJournalData(journal);
   
-  const { data, error } = await supabase
-    .from('journals')
-    .insert([encryptedJournal])
-    .select();
+  try {
+    const encryptedJournal = await encryptJournalData(journal);
+    console.log('Encrypted journal mood:', typeof encryptedJournal.mood, encryptedJournal.mood);
     
-  if (error) throw error;
-  return data[0] ? await decryptJournalData(data[0] as EncryptedJournalEntry) : null;
+    const { data, error } = await supabase
+      .from('journals')
+      .insert([encryptedJournal])
+      .select();
+      
+    if (error) {
+      console.error('Supabase insert error:', error);
+      throw error;
+    }
+    return data[0] ? await decryptJournalData(data[0] as EncryptedJournalEntry) : null;
+  } catch (encryptionError) {
+    console.error('Encryption error:', encryptionError);
+    throw encryptionError;
+  }
 }
 
 export async function updateJournal(id: number, journal: Partial<JournalEntry>) {
+  console.log('Updating journal with mood:', journal.mood);
   const supabase = getSupabaseClient();
   
-  // If updating title or content, encrypt them
+  // If updating title, content, or mood, encrypt them
   const updates: Partial<EncryptedJournalEntry> = { ...journal };
   const key = getEncryptionKey();
   
@@ -143,14 +158,21 @@ export async function updateJournal(id: number, journal: Partial<JournalEntry>) 
   if (journal.title) {
     encryptionPromises.push(
       encrypt(journal.title, key).then(encrypted => {
-        updates.title = encrypted;
+        updates.title = JSON.stringify(encrypted);
       })
     );
   }
   if (journal.content) {
     encryptionPromises.push(
       encrypt(journal.content, key).then(encrypted => {
-        updates.content = encrypted;
+        updates.content = JSON.stringify(encrypted);
+      })
+    );
+  }
+  if (journal.mood !== undefined) {
+    encryptionPromises.push(
+      encodeMoodForDb(journal.mood, key).then(encrypted => {
+        updates.mood = typeof encrypted === 'object' ? JSON.stringify(encrypted) : encrypted;
       })
     );
   }
@@ -164,7 +186,10 @@ export async function updateJournal(id: number, journal: Partial<JournalEntry>) 
     .eq('id', id)
     .select();
     
-  if (error) throw error;
+  if (error) {
+    console.error('Supabase update error:', error);
+    throw error;
+  }
   return data[0] ? await decryptJournalData(data[0] as EncryptedJournalEntry) : null;
 }
 
