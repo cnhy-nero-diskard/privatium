@@ -249,6 +249,9 @@ const HomePage: React.FC = () => {
 													<h3 className="font-medium text-gray-100 text-lg mb-1">
 														{entry.title}
 													</h3>
+													<div className="text-xs italic text-gray-400 mb-2 line-clamp-1">
+														{entry.content ? (entry.content.length > 100 ? `${entry.content.substring(0, 100)}...` : entry.content) : ''}
+													</div>
 													<div className="flex items-center gap-3 text-sm text-gray-400">
 														<span className="flex items-center gap-1">
 															<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
