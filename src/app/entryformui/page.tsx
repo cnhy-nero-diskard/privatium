@@ -4,10 +4,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, Meh, Frown, Angry, Calendar, Clock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createJournal, updateJournal } from "@/utils/supabaseClient";
-import { RichTextEditor } from "@/app/components/RichTextEditor";
+import { PlainTextEditor } from "@/app/components/PlainTextEditor";
 import { getAllMoods, getMoodDefinition } from "@/utils/moodUtils";
 import { logMoodSelection, logSaveAttempt } from "@/utils/debugMood";
-import '@/app/components/rich-text-editor.css';
 
 const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
 
@@ -29,15 +28,8 @@ function getCurrentTime(): string {
   return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-import { Descendant } from 'slate';
-
-// Default value for the rich text editor
-const initialValue: Descendant[] = [
-  {
-    type: 'paragraph',
-    children: [{ text: '' }],
-  },
-];
+// Default value for the plain text editor
+const initialValue: string = '';
 
 const EntryForm: React.FC = () => {
   const router = useRouter();
@@ -49,12 +41,9 @@ const EntryForm: React.FC = () => {
   const [date, setDate] = useState<string>(isEdit && searchParams ? searchParams.get('date') || formatDate(today) : formatDate(today));
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [title, setTitle] = useState<string>(isEdit && searchParams ? searchParams.get('title') || '' : '');
-  const [slateValue, setSlateValue] = useState<Descendant[]>(() => {
+  const [content, setContent] = useState<string>(() => {
     if (isEdit && searchParams?.get('content')) {
-      return [{ 
-        type: 'paragraph',
-        children: [{ text: searchParams.get('content') || '' }]
-      }];
+      return searchParams.get('content') || '';
     }
     return initialValue;
   });
@@ -108,19 +97,14 @@ const EntryForm: React.FC = () => {
     setShowDatePicker(false);
   };
   
-  // Handle rich text editor changes
-  const handleEditorChange = (value: Descendant[]) => {
-    setSlateValue(value);
+  // Handle text editor changes
+  const handleEditorChange = (value: string) => {
+    setContent(value);
   };
 
-  // Check if the slate value has content
+  // Check if the content has text
   const hasContent = () => {
-    if (!slateValue || slateValue.length === 0) return false;
-    return slateValue.some((node: any) => 
-      node.text !== undefined && node.text.trim() !== '' || 
-      (node.children && node.children.some((child: any) => 
-        child.text !== undefined && child.text.trim() !== ''))
-    );
+    return content && content.trim().length > 0;
   };
 
   // Progress calculation
@@ -168,7 +152,7 @@ const EntryForm: React.FC = () => {
       const journalData = {
         date,
         title,
-        content: JSON.stringify(slateValue),
+        content: content, // Now just storing plain text
         folder,
         mood: mood || ''
       };
@@ -338,10 +322,10 @@ const EntryForm: React.FC = () => {
             required
           />
           
-          {/* Rich Text Editor */}
+          {/* Plain Text Editor */}
           <div className="w-full dark:text-gray-100">
-            <RichTextEditor 
-              value={slateValue}
+            <PlainTextEditor 
+              value={content}
               onChange={handleEditorChange}
             />
           </div>
