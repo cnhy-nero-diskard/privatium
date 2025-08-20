@@ -7,7 +7,7 @@ Privatium is a personal journal web application built with [Next.js](https://nex
 
 - Personal journal app, not multi-user
 - Full control and ownership of your data
-- No cloud sync or external storage by default
+- You can setup your own database service storage of choice. Default: Supabase.
 - Built with Next.js, Tailwind CSS, and Supabase
 
 ---
