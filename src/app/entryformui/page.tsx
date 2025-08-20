@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, Meh, Frown, Angry, Calendar, Clock } from "lucide-react";
+import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, Meh, Frown, Angry, Calendar, Clock, SmilePlus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createJournal, updateJournal } from "@/utils/supabaseClient";
 import { PlainTextEditor } from "@/app/components/PlainTextEditor";
@@ -26,6 +26,24 @@ function getCurrentFormattedDate(): string {
 function getCurrentTime(): string {
   const now = new Date();
   return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Map mood labels to Lucide icons
+function getMoodIcon(moodLabel: string) {
+  switch(moodLabel) {
+    case 'Very Happy':
+      return <SmilePlus className="w-5 h-5" />;
+    case 'Happy':
+      return <Smile className="w-5 h-5" />;
+    case 'Neutral':
+      return <Meh className="w-5 h-5" />;
+    case 'Sad':
+      return <Frown className="w-5 h-5" />;
+    case 'Angry':
+      return <Angry className="w-5 h-5" />;
+    default:
+      return <Meh className="w-5 h-5" />;
+  }
 }
 
 // Default value for the plain text editor
@@ -333,7 +351,7 @@ const EntryForm: React.FC = () => {
         
         {/* Bottom Panel with Folder, Tags, Mood, Location */}
         <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/80 rounded-b-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Folder Selection */}
             <div className="flex flex-col">
               <label htmlFor="folder" className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -393,16 +411,16 @@ const EntryForm: React.FC = () => {
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                 Select Mood
               </label>
-              <div className="flex items-center gap-2" role="group" aria-label="Mood selector">
+              <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Mood selector">
                 {getAllMoods().map((moodDef) => {
                   return (
                     <button
                       key={moodDef.id}
                       type="button"
-                      className={`rounded-full p-2 border focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 relative group ${
+                      className={`rounded-full p-2 border focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 relative group w-10 h-10 flex items-center justify-center ${
                         mood === moodDef.label
-                          ? "bg-blue-100 dark:bg-blue-900 border-blue-400"
-                          : "bg-transparent border-transparent hover:bg-gray-100 dark:hover:bg-gray-700"
+                          ? "bg-blue-100 dark:bg-blue-900 border-blue-400 text-blue-500 dark:text-blue-400"
+                          : "bg-transparent border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                       }`}
                       aria-pressed={mood === moodDef.label}
                       aria-label={moodDef.label}
@@ -413,8 +431,8 @@ const EntryForm: React.FC = () => {
                         logMoodSelection(newMood);
                       }}
                     >
-                      <span className="text-lg">{moodDef.emoji}</span>
-                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none bg-black/80 text-white text-xs rounded px-2 py-1 transition-all whitespace-nowrap">
+                      {getMoodIcon(moodDef.label)}
+                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none bg-black/80 text-white text-xs rounded px-2 py-1 transition-all whitespace-nowrap z-10">
                         {moodDef.label}
                       </span>
                     </button>
