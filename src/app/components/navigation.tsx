@@ -41,7 +41,7 @@ export function Navigation() {
         <Link href="/" className="font-bold text-xl">PRIVATIUM</Link>
         <div className="flex items-center gap-6">
           <Link 
-            href="/components/entryformui" 
+            href="/entryformui" 
             className="hover:text-accent-color transition-colors"
           >
             New Entry

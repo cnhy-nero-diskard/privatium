@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, Meh, Frown, Angry, Calendar, Clock, SmilePlus } from "lucide-react";
+import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, SmilePlus, Meh, Frown, Angry, Calendar, Clock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createJournal, updateJournal } from "@/utils/supabaseClient";
 import { PlainTextEditor } from "@/app/components/PlainTextEditor";
@@ -28,8 +28,8 @@ function getCurrentTime(): string {
   return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Map mood labels to Lucide icons
-function getMoodIcon(moodLabel: string) {
+// Helper functions
+function getMoodIcon(moodLabel: string): React.ReactElement {
   switch(moodLabel) {
     case 'Very Happy':
       return <SmilePlus className="w-5 h-5" />;
