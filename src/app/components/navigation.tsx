@@ -26,7 +26,7 @@ export function Navigation() {
     return (
       <nav className="w-full bg-card-background border-b border-border-color p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link href="/" className="font-bold text-xl">PRIVATIUM</Link>
+          <Link href="/home" className="font-bold text-xl">PRIVATIUM</Link>
           <div className="flex items-center gap-6">
             <div className="w-8 h-8"></div> {/* Placeholder for theme toggle */}
           </div>
@@ -38,7 +38,7 @@ export function Navigation() {
   return (
     <nav className="w-full fixed top-0 z-10 bg-card-background border-b border-border-color p-4 shadow-sm">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <Link href="/" className="font-bold text-xl">PRIVATIUM</Link>
+        <Link href="/home" className="font-bold text-xl">PRIVATIUM</Link>
         <div className="flex items-center gap-6">
           <Link 
             href="/entryformui" 

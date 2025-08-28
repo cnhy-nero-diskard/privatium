@@ -91,21 +91,30 @@ async function decryptJournalData(journal: EncryptedJournalEntry): Promise<Journ
 }
 
 export async function getJournals() {
-  const supabase = getSupabaseClient();
-  
-  const { data, error } = await supabase
-    .from('journals')
-    .select('*')
-    .order('date', { ascending: false });
+  try {
+    const supabase = getSupabaseClient();
     
-  if (error) throw error;
-  if (!data) return [];
-  
-  // Decrypt all journals in parallel
-  const decryptedJournals = await Promise.all(
-    data.map(journal => decryptJournalData(journal as EncryptedJournalEntry))
-  );
-  return decryptedJournals;
+    const { data, error } = await supabase
+      .from('journals')
+      .select('*')
+      .order('date', { ascending: false });
+      
+    if (error) {
+      console.error('Supabase query error:', error);
+      throw error;
+    }
+    
+    if (!data) return [];
+    
+    // Decrypt all journals in parallel
+    const decryptedJournals = await Promise.all(
+      data.map(journal => decryptJournalData(journal as EncryptedJournalEntry))
+    );
+    return decryptedJournals;
+  } catch (error) {
+    console.error('Failed to fetch or decrypt journals:', error);
+    throw new Error('Failed to fetch journal entries. Please check your connection and try again.');
+  }
 }
 
 export async function getJournalById(id: number) {
