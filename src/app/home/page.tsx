@@ -22,12 +22,34 @@ const HomePage: React.FC = () => {
 
 	const fetchEntries = async () => {
 		setError(null);
+		setLoading(true);
 		try {
 			const data = await getJournals();
+			
+			// Check for decryption errors
+			const hasDecryptionErrors = data.some(entry => entry._decryptError);
+			if (hasDecryptionErrors) {
+				setError('Some entries could not be decrypted properly. They will be shown with placeholder content.');
+			}
+			
 			setEntries(data || []);
 		} catch (error) {
 			console.error('Error fetching entries:', error);
-			const errorMessage = error instanceof Error ? error.message : 'Failed to fetch entries';
+			let errorMessage: string;
+			
+			if (error instanceof Error) {
+				// Handle specific error types
+				if (error.message.includes('Database query failed')) {
+					errorMessage = 'Unable to connect to the database. Please check your internet connection.';
+				} else if (error.message.includes('decrypt')) {
+					errorMessage = 'There was a problem decrypting your journal entries. Please check your encryption settings.';
+				} else {
+					errorMessage = error.message;
+				}
+			} else {
+				errorMessage = 'An unexpected error occurred. Please try again later.';
+			}
+			
 			setError(errorMessage);
 			setEntries([]);
 		} finally {

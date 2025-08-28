@@ -100,20 +100,54 @@ export async function getJournals() {
       .order('date', { ascending: false });
       
     if (error) {
-      console.error('Supabase query error:', error);
-      throw error;
+      console.error('Supabase query error:', JSON.stringify(error, null, 2));
+      throw new Error(`Database query failed: ${error.message || 'Unknown error occurred'}`);
     }
     
-    if (!data) return [];
+    if (!data) {
+      console.error('No data returned from Supabase');
+      throw new Error('No data received from the database');
+    }
     
-    // Decrypt all journals in parallel
-    const decryptedJournals = await Promise.all(
-      data.map(journal => decryptJournalData(journal as EncryptedJournalEntry))
-    );
-    return decryptedJournals;
+    try {
+      // Decrypt all journals in parallel
+      const decryptedJournals = await Promise.all(
+        data.map(async (journal) => {
+          try {
+            return await decryptJournalData(journal as EncryptedJournalEntry);
+          } catch (decryptError) {
+            console.error(`Failed to decrypt journal ${journal.id}:`, decryptError);
+            // Return a sanitized version of the entry with error indicators
+            return {
+              ...journal,
+              title: '[Encryption Error] Unable to decrypt title',
+              content: '[Encryption Error] Unable to decrypt content',
+              mood: '',
+              _decryptError: true
+            };
+          }
+        })
+      );
+      
+      // If any journals had decryption errors, log it but don't fail completely
+      const hasDecryptionErrors = decryptedJournals.some(j => j._decryptError);
+      if (hasDecryptionErrors) {
+        console.warn('Some journals could not be decrypted properly');
+      }
+      
+      return decryptedJournals;
+    } catch (decryptError) {
+      console.error('Failed to decrypt journals:', JSON.stringify(decryptError, null, 2));
+      throw new Error('Failed to decrypt journal entries. Your encryption key might be invalid.');
+    }
   } catch (error) {
-    console.error('Failed to fetch or decrypt journals:', error);
-    throw new Error('Failed to fetch journal entries. Please check your connection and try again.');
+    // Check if it's our custom error first
+    if (error instanceof Error) {
+      throw error; // Re-throw our custom errors
+    }
+    // For unexpected errors, provide a generic message
+    console.error('Unexpected error in getJournals:', JSON.stringify(error, null, 2));
+    throw new Error('An unexpected error occurred while fetching your journals. Please try again later.');
   }
 }
 

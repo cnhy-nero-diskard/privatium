@@ -60,13 +60,13 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/40 animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div
         ref={modalRef}
         tabIndex={-1}
         aria-modal="true"
         role="dialog"
-        className="bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 rounded-3xl shadow-2xl p-6 sm:p-8 max-w-xl min-w-[320px] w-full min-h-[320px] max-h-[90vh] relative border-2 border-blue-200 dark:border-blue-700 scale-95 animate-modalPop transition-all duration-300 flex flex-col focus:outline-none"
+        className="bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-blue-900 rounded-3xl shadow-2xl p-6 sm:p-8 max-w-xl min-w-[320px] w-full min-h-[320px] max-h-[90vh] relative border-2 border-blue-200 dark:border-blue-700 animate-modalEnter flex flex-col focus:outline-none"
       >
         <button
           className="absolute top-4 right-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors text-xl font-bold shadow-md"
