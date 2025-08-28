@@ -87,7 +87,7 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
               Mood: <MoodWithLabel mood={entry.mood} />
             </span>
           </div>
-          <div ref={contentRef} className="prose dark:prose-invert min-h-[120px] max-h-[320px] sm:max-h-[400px] overflow-y-auto text-base text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-800 mb-4 break-words">
+          <div ref={contentRef} className="prose dark:prose-invert min-h-[120px] max-h-[320px] sm:max-h-[400px] overflow-y-auto text-base text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-800 mb-4 break-words whitespace-pre-wrap">
             {entry.content?.length ? entry.content : <span className="italic text-gray-400">No content available.</span>}
           </div>
           <div className="flex justify-between items-center mt-2 gap-2 flex-wrap">
