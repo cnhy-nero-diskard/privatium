@@ -4,11 +4,25 @@ import { FaRegCopy, FaEdit, FaTrash } from "react-icons/fa";
 import { MoodWithLabel } from "./MoodIcon";
 import { saveEntryState } from "@/utils/entryStateManager";
 
+import { Tag } from '@/types/tags';
+
+interface JournalEntry {
+  id: number;
+  title: string;
+  content: string;
+  date: string;
+  mood: string;
+  folder: string;
+  tags?: Tag[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 interface JournalModalProps {
-  entry: any;
+  entry: JournalEntry;
   onClose: () => void;
-  onEdit?: (updatedEntry: any) => void;
-  onDelete?: (entryId: string) => void;
+  onEdit?: (updatedEntry: JournalEntry) => void;
+  onDelete?: (entryId: number) => void;
 }
 
 const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete }) => {
@@ -51,7 +65,8 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
       date: entry.date || '',
       folder: entry.folder || '',
       mood: entry.mood || '',
-      content: entry.content || ''
+      content: entry.content || '',
+      tags: entry.tags || []
     });
     // Close the modal and navigate to edit form
     onClose();
@@ -92,17 +107,31 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
           <h2 className="font-extrabold mb-2 text-blue-700 dark:text-blue-300 text-2xl sm:text-3xl font-journal tracking-wide break-words max-w-full" title={entry.title}>
             {entry.title?.length ? entry.title : <span className="italic text-gray-400">No Title</span>}
           </h2>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
-            <span>{entry.date}</span>
-            <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-700">{entry.folder || <span className="italic text-gray-400">No Folder</span>}</span>
-            <span className="flex items-center gap-1 font-semibold">
-              Mood: <MoodWithLabel mood={entry.mood} />
-            </span>
-            <span className="ml-auto flex items-center gap-2">
-              <span>{wordCount} words</span>
-              <span>•</span>
-              <span>{charCount} characters</span>
-            </span>
+          <div className="flex flex-col gap-2 mb-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+              <span>{entry.date}</span>
+              <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-700">{entry.folder || <span className="italic text-gray-400">No Folder</span>}</span>
+              <span className="flex items-center gap-1 font-semibold">
+                Mood: <MoodWithLabel mood={entry.mood} />
+              </span>
+              <span className="ml-auto flex items-center gap-2">
+                <span>{wordCount} words</span>
+                <span>•</span>
+                <span>{charCount} characters</span>
+              </span>
+            </div>
+            {entry.tags && entry.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {entry.tags.map(tag => (
+                  <span
+                    key={tag.id}
+                    className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full border border-blue-200 dark:border-blue-700"
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div ref={contentRef} className="prose dark:prose-invert min-h-[120px] max-h-[320px] sm:max-h-[400px] overflow-y-auto text-base text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-800 mb-4 break-words whitespace-pre-wrap">
             {entry.content?.length ? entry.content : <span className="italic text-gray-400">No content available.</span>}
@@ -134,8 +163,8 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
                 <FaTrash />
               </button>
             </div>
-            {entry.lastEdited && (
-              <span className="text-xs text-gray-400">Last edited: {entry.lastEdited}</span>
+            {entry.updated_at && (
+              <span className="text-xs text-gray-400">Last edited: {new Date(entry.updated_at).toLocaleString()}</span>
             )}
           </div>
         </>

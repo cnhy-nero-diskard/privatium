@@ -4,6 +4,7 @@ import JournalModal from "../components/JournalModal";
 import Link from "next/link";
 import TopNavigation from "../components/TopNavigation";
 import { getJournals, updateJournal, deleteJournal } from "@/utils/supabaseClient";
+import { getJournalTags } from "@/utils/tagUtils";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { MoodIcon } from "../components/MoodIcon";
 
@@ -32,7 +33,15 @@ const HomePage: React.FC = () => {
 				setError('Some entries could not be decrypted properly. They will be shown with placeholder content.');
 			}
 			
-			setEntries(data || []);
+			// Load tags for each entry
+			const entriesWithTags = await Promise.all(
+				data.map(async (entry) => {
+					const tags = await getJournalTags(entry.id);
+					return { ...entry, tags };
+				})
+			);
+			
+			setEntries(entriesWithTags || []);
 		} catch (error) {
 			console.error('Error fetching entries:', error);
 			let errorMessage: string;

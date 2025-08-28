@@ -1,3 +1,5 @@
+import { Tag } from "../types/tags";
+
 interface EntryState {
   id?: string;
   title?: string;
@@ -5,6 +7,7 @@ interface EntryState {
   content?: string;
   folder?: string;
   mood?: string;
+  tags?: Tag[];
 }
 
 export const saveEntryState = (entry: EntryState) => {

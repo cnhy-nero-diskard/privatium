@@ -4,10 +4,13 @@ import React, { useState, useRef, useEffect } from "react";
 import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, SmilePlus, Meh, Frown, Angry, Calendar, Clock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createJournal, updateJournal } from "@/utils/supabaseClient";
+import { updateJournalTags } from "@/utils/tagUtils";
 import { PlainTextEditor } from "@/app/components/PlainTextEditor";
 import { getAllMoods, getMoodDefinition } from "@/utils/moodUtils";
 import { logMoodSelection, logSaveAttempt } from "@/utils/debugMood";
 import { getEntryState, clearEntryState } from "@/utils/entryStateManager";
+import { TagInput } from "@/app/components/TagInput";
+import { Tag } from "@/types/tags";
 
 const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
 
@@ -85,21 +88,20 @@ const EntryForm: React.FC = () => {
           setContent(entryState.content || '');
           setFolder(entryState.folder || FOLDER_OPTIONS[0]);
           if (entryState.mood) setMood(entryState.mood);
+          if (entryState.tags) setSelectedTags(entryState.tags);
           // Clear the state after loading
           clearEntryState();
         }
       });
     }
   }, [isEdit]);
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState<string>("");
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [mood, setMood] = useState<string | null>(isEdit && searchParams ? searchParams.get('mood') || null : null);
   const [location, setLocation] = useState<string>("");
   const [weather] = useState<string>("☀️ Sunny");
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<string>(getCurrentTime());
   const [formattedDate, setFormattedDate] = useState<string>(getCurrentFormattedDate());
-  const tagInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLInputElement>(null);
   
   // Update time every minute
@@ -168,22 +170,7 @@ const EntryForm: React.FC = () => {
     );
   };
 
-  // Tag add handler
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
-      e.preventDefault();
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
-      }
-      setTagInput("");
-    } else if (e.key === "Backspace" && !tagInput && tags.length) {
-      setTags(tags.slice(0, -1));
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
-  };
+  // Tag handling is now done by the TagInput component
 
   // Submit handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -195,7 +182,7 @@ const EntryForm: React.FC = () => {
       const journalData = {
         date,
         title,
-        content: content, // Now just storing plain text
+        content: content,
         folder,
         mood: mood || ''
       };
@@ -206,11 +193,21 @@ const EntryForm: React.FC = () => {
       if (isEdit && editId) {
         // Update existing entry
         console.log('Updating entry with ID:', editId);
-        await updateJournal(parseInt(editId), journalData);
+        const updatedEntry = await updateJournal(parseInt(editId), journalData);
+        if (updatedEntry?.id) {
+          // Update tags
+          const tagIds = selectedTags.map(tag => tag.id!);
+          await updateJournalTags(updatedEntry.id, tagIds);
+        }
       } else {
         // Create new entry
         console.log('Creating new entry');
-        await createJournal(journalData);
+        const newEntry = await createJournal(journalData);
+        if (newEntry?.id && selectedTags.length > 0) {
+          // Add tags to the new entry
+          const tagIds = selectedTags.map(tag => tag.id!);
+          await updateJournalTags(newEntry.id, tagIds);
+        }
       }
       
       setSaved(true);
@@ -404,35 +401,10 @@ const EntryForm: React.FC = () => {
               <label htmlFor="tags" className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                 Select Tags
               </label>
-              <div className="flex flex-wrap gap-1 border rounded px-2 py-1 bg-white dark:bg-gray-700 min-h-[38px]">
-                {tags.map((tag, i) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-800/50 dark:text-blue-200"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      className="ml-1 text-blue-400 hover:text-red-500 focus:outline-none"
-                      aria-label={`Remove tag ${tag}`}
-                      onClick={() => removeTag(tag)}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  id="tags"
-                  ref={tagInputRef}
-                  type="text"
-                  className="border-0 focus:ring-0 text-sm flex-1 min-w-[60px] bg-transparent"
-                  placeholder={tags.length ? "" : "Add tag"}
-                  value={tagInput}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  aria-label="Add tag"
-                />
-              </div>
+              <TagInput
+                selectedTags={selectedTags}
+                onChange={setSelectedTags}
+              />
             </div>
             
             {/* Mood */}

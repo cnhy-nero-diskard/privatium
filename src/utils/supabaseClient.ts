@@ -2,6 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { decrypt, encrypt, isEncryptedData, type EncryptedData } from './encryption';
 import { encodeMoodForDb, decodeMoodFromDb } from './moodUtils';
 
+interface Tag {
+  id?: number;
+  name: string;
+  created_at?: string;
+}
+
 interface JournalEntry {
   id?: number;
   date: string;
@@ -11,6 +17,7 @@ interface JournalEntry {
   mood: string;
   created_at?: string;
   updated_at?: string;
+  tags?: Tag[];
 }
 
 interface EncryptedJournalEntry extends Omit<JournalEntry, 'title' | 'content' | 'mood'> {
