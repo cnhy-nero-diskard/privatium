@@ -62,6 +62,16 @@ const EntryForm: React.FC = () => {
   const [title, setTitle] = useState<string>('');
   const [content, setContent] = useState<string>(initialValue);
   const [folder, setFolder] = useState<string>(FOLDER_OPTIONS[0]);
+  const [wordCount, setWordCount] = useState<number>(0);
+  const [charCount, setCharCount] = useState<number>(0);
+
+  // Calculate word and character counts whenever content changes
+  useEffect(() => {
+    const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+    const chars = content.replace(/\s/g, '').length;
+    setWordCount(words);
+    setCharCount(chars);
+  }, [content]);
 
   // Load entry state from session storage on mount if editing
   useEffect(() => {
@@ -357,6 +367,10 @@ const EntryForm: React.FC = () => {
           
           {/* Plain Text Editor */}
           <div className="w-full dark:text-gray-100">
+            <div className="flex justify-end mb-2 text-sm text-gray-500 dark:text-gray-400">
+              <span className="mr-4">{wordCount} words</span>
+              <span>{charCount} characters</span>
+            </div>
             <PlainTextEditor 
               value={content}
               onChange={handleEditorChange}

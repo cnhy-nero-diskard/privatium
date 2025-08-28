@@ -17,11 +17,23 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
   const modalRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  const [wordCount, setWordCount] = React.useState<number>(0);
+  const [charCount, setCharCount] = React.useState<number>(0);
+
   React.useEffect(() => {
     if (modalRef.current) {
       modalRef.current.focus();
     }
   }, []);
+
+  React.useEffect(() => {
+    if (entry?.content) {
+      const words = entry.content.trim() ? entry.content.trim().split(/\s+/).length : 0;
+      const chars = entry.content.replace(/\s/g, '').length;
+      setWordCount(words);
+      setCharCount(chars);
+    }
+  }, [entry?.content]);
 
   if (!entry) return null;
 
@@ -85,6 +97,11 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
             <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-700">{entry.folder || <span className="italic text-gray-400">No Folder</span>}</span>
             <span className="flex items-center gap-1 font-semibold">
               Mood: <MoodWithLabel mood={entry.mood} />
+            </span>
+            <span className="ml-auto flex items-center gap-2">
+              <span>{wordCount} words</span>
+              <span>•</span>
+              <span>{charCount} characters</span>
             </span>
           </div>
           <div ref={contentRef} className="prose dark:prose-invert min-h-[120px] max-h-[320px] sm:max-h-[400px] overflow-y-auto text-base text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-800 mb-4 break-words whitespace-pre-wrap">
