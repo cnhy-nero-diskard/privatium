@@ -8,16 +8,29 @@ import { getJournalTags } from "@/utils/tagUtils";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { MoodIcon } from "../components/MoodIcon";
 
+import { Tag } from '@/types/tags';
+
+interface JournalEntry {
+	id: number;
+	title: string;
+	content: string;
+	date: string;
+	folder: string;
+	mood: string;
+	tags?: Tag[];
+	_decryptError?: boolean;
+}
+
 const HomePage: React.FC = () => {
-	const [entries, setEntries] = useState<any[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
-	const [searchTerm, setSearchTerm] = useState("");
-	const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-	const [multiSelectMode, setMultiSelectMode] = useState(false);
-	const [selectedIds, setSelectedIds] = useState<number[]>([]);
-	const [showDeleteModal, setShowDeleteModal] = useState(false);
-	const [deleteType, setDeleteType] = useState<'single' | 'multi'>('single');
+    const [entries, setEntries] = useState<JournalEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+    const [multiSelectMode, setMultiSelectMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteType, setDeleteType] = useState<'single' | 'multi'>('single');
 
 	const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +50,7 @@ const HomePage: React.FC = () => {
 			const entriesWithTags = await Promise.all(
 				data.map(async (entry) => {
 					const tags = await getJournalTags(entry.id);
-					return { ...entry, tags };
+					return { ...entry, content: entry.content ?? "", tags };
 				})
 			);
 			
@@ -277,14 +290,50 @@ const HomePage: React.FC = () => {
 									</button>
 								</div>
 							)}
-							<div className="grid gap-4">
-								{entries
-									.filter(entry =>
-										(!searchTerm || entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-											entry.content?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-										(!selectedFolder || entry.folder === selectedFolder)
-									)
-									.map((entry) => (
+							<div className="space-y-6">
+								{Object.entries(
+									entries
+										.filter(entry =>
+											(!searchTerm || entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+												entry.content?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+											(!selectedFolder || entry.folder === selectedFolder)
+										)
+										.reduce((groups: { [key: string]: typeof entries }, entry) => {
+											const date = new Date(entry.date);
+											const today = new Date();
+											const yesterday = new Date(today);
+											yesterday.setDate(yesterday.getDate() - 1);
+											
+											let dateKey = entry.date;
+											if (date.toDateString() === today.toDateString()) {
+												dateKey = "Today";
+											} else if (date.toDateString() === yesterday.toDateString()) {
+												dateKey = "Yesterday";
+											}
+											
+											if (!groups[dateKey]) {
+												groups[dateKey] = [];
+											}
+											groups[dateKey].push(entry);
+											return groups;
+										}, {})
+								)
+									.sort(([dateA], [dateB]) => {
+										const a = dateA === "Today" ? new Date() :
+											dateA === "Yesterday" ? new Date(new Date().setDate(new Date().getDate() - 1)) :
+											new Date(dateA);
+										const b = dateB === "Today" ? new Date() :
+											dateB === "Yesterday" ? new Date(new Date().setDate(new Date().getDate() - 1)) :
+											new Date(dateB);
+										return b.getTime() - a.getTime();
+									})
+									.map(([date, groupEntries]) => (
+										<div key={date} className="space-y-4">
+											<h3 className="text-sm font-medium text-gray-400/70 pl-2 border-l-2 border-gray-700/30">
+												{date}
+											</h3>
+											<div className="grid gap-4">
+												{groupEntries.map((entry) => (
 										<div
 											key={entry.id}
 											className={`bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 transition-all duration-300 border border-gray-700/50 hover:border-gray-600 ${multiSelectMode ? 'flex items-center gap-3' : 'cursor-pointer hover:bg-gray-800/70'}`}
@@ -328,6 +377,10 @@ const HomePage: React.FC = () => {
 											</div>
 										</div>
 									))}
+											</div>
+										</div>
+									))
+								}
 							</div>
 						</>
 					)}
