@@ -7,6 +7,7 @@ import { createJournal, updateJournal } from "@/utils/supabaseClient";
 import { PlainTextEditor } from "@/app/components/PlainTextEditor";
 import { getAllMoods, getMoodDefinition } from "@/utils/moodUtils";
 import { logMoodSelection, logSaveAttempt } from "@/utils/debugMood";
+import { getEntryState, clearEntryState } from "@/utils/entryStateManager";
 
 const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
 
@@ -53,19 +54,33 @@ const EntryForm: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isEdit = searchParams?.get('page') === 'edit';
-  const editId = searchParams?.get('id');
+  const [editId, setEditId] = useState<string | null>(null);
   
   const today = new Date();
-  const [date, setDate] = useState<string>(isEdit && searchParams ? searchParams.get('date') || formatDate(today) : formatDate(today));
+  const [date, setDate] = useState<string>(formatDate(today));
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
-  const [title, setTitle] = useState<string>(isEdit && searchParams ? searchParams.get('title') || '' : '');
-  const [content, setContent] = useState<string>(() => {
-    if (isEdit && searchParams?.get('content')) {
-      return searchParams.get('content') || '';
+  const [title, setTitle] = useState<string>('');
+  const [content, setContent] = useState<string>(initialValue);
+  const [folder, setFolder] = useState<string>(FOLDER_OPTIONS[0]);
+
+  // Load entry state from session storage on mount if editing
+  useEffect(() => {
+    if (isEdit) {
+      import('@/utils/entryStateManager').then(({ getEntryState, clearEntryState }) => {
+        const entryState = getEntryState();
+        if (entryState) {
+          setEditId(entryState.id || null);
+          setDate(entryState.date || formatDate(today));
+          setTitle(entryState.title || '');
+          setContent(entryState.content || '');
+          setFolder(entryState.folder || FOLDER_OPTIONS[0]);
+          if (entryState.mood) setMood(entryState.mood);
+          // Clear the state after loading
+          clearEntryState();
+        }
+      });
     }
-    return initialValue;
-  });
-  const [folder, setFolder] = useState<string>(isEdit && searchParams ? searchParams.get('folder') || FOLDER_OPTIONS[0] : FOLDER_OPTIONS[0]);
+  }, [isEdit]);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>("");
   const [mood, setMood] = useState<string | null>(isEdit && searchParams ? searchParams.get('mood') || null : null);

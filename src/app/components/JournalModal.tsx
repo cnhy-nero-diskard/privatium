@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import { useRouter } from 'next/navigation';
 import { FaRegCopy, FaEdit, FaTrash } from "react-icons/fa";
 import { MoodWithLabel } from "./MoodIcon";
+import { saveEntryState } from "@/utils/entryStateManager";
 
 interface JournalModalProps {
   entry: any;
@@ -31,9 +32,8 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
   };
 
   const handleEditClick = () => {
-    // Redirect to entryformui with entry data including ID
-    const params = new URLSearchParams({
-      page: 'edit',
+    // Save entry state to session storage
+    saveEntryState({
       id: entry.id.toString(),
       title: entry.title || '',
       date: entry.date || '',
@@ -41,8 +41,9 @@ const JournalModal: React.FC<JournalModalProps> = ({ entry, onClose, onDelete })
       mood: entry.mood || '',
       content: entry.content || ''
     });
-    // Use Next.js router for client-side navigation
-    router.push(`/entryformui?${params.toString()}`);
+    // Close the modal and navigate to edit form
+    onClose();
+    router.push('/entryformui?page=edit');
   };
 
   const handleDeleteClick = () => {
