@@ -4,9 +4,11 @@ import React from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
+import QuickNoteModal from "./QuickNoteModal";
 
 const TopNavigation = () => {
   const [mounted, setMounted] = useState(false);
+  const [quickNoteModalOpen, setQuickNoteModalOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
   // Wait for component to mount to access theme
@@ -66,12 +68,34 @@ const TopNavigation = () => {
           </svg>
           <span className="font-semibold">Home</span>
         </Link>
+        
+        {/* Quick Note Button */}
+        <button 
+          onClick={() => setQuickNoteModalOpen(true)}
+          className="flex items-center px-4 py-2 rounded-full shadow-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors duration-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          <span className="font-semibold">Quick Note</span>
+        </button>
+        
         <Link href="/entryformui" className="flex items-center px-4 py-2 rounded-full shadow-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           <span className="font-semibold">New Entry</span>
         </Link>
+        
+        {/* Quick Note Modal */}
+        <QuickNoteModal 
+          isOpen={quickNoteModalOpen} 
+          onClose={() => setQuickNoteModalOpen(false)} 
+          onNoteAdded={() => {
+            // You can implement refresh logic here if needed
+            window.location.reload(); // Simple refresh for now
+          }}
+        />
       </div>
     </>
   );

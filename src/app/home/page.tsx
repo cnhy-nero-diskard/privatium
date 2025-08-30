@@ -19,6 +19,8 @@ interface JournalEntry {
 	mood: string;
 	tags?: Tag[];
 	_decryptError?: boolean;
+	created_at?: string;
+	updated_at?: string;
 }
 
 const HomePage: React.FC = () => {
@@ -81,6 +83,13 @@ const HomePage: React.FC = () => {
 
 	useEffect(() => {
 		fetchEntries();
+		
+		// Set up refresh interval to check for new notes (optional)
+		const refreshInterval = setInterval(() => {
+			fetchEntries();
+		}, 60000); // Refresh every minute
+		
+		return () => clearInterval(refreshInterval);
 	}, []);
 
 	// Handler for editing an entry
@@ -333,10 +342,35 @@ const HomePage: React.FC = () => {
 												{date}
 											</h3>
 											<div className="grid gap-4">
-												{groupEntries.map((entry) => (
+												{groupEntries.map((entry) => {
+										// Check if this is a quick note (no content) and if it's recent (within 24 hours)
+										const isQuickNote = !entry.content || entry.content.trim() === '';
+										
+										// Calculate if the entry is recent (within last 24 hours)
+										const entryDate = new Date(entry.date);
+										const now = new Date();
+										const hoursSinceCreation = (now.getTime() - entryDate.getTime()) / (1000 * 60 * 60);
+										const isRecent = hoursSinceCreation <= 24;
+										
+										// Determine CSS classes for highlighting
+										let entryClasses = `backdrop-blur-sm rounded-lg transition-all duration-300 border hover:border-gray-600 
+										    ${multiSelectMode ? 'flex items-center gap-3' : 'cursor-pointer'}`;
+										
+										// Apply different styling based on entry type
+										if (isQuickNote) {
+											// Quick note styling
+											entryClasses += isRecent 
+											    ? ' bg-gradient-to-r from-purple-700/60 to-blue-700/60 border-purple-500/50 p-3'  // Recent note (highlighted)
+											    : ' bg-gray-800/30 border-gray-700/30 p-3'; // Older note (greyed out)
+										} else {
+											// Regular entry styling
+											entryClasses += ' bg-gray-800/50 border-gray-700/50 p-4 hover:bg-gray-800/70';
+										}
+										
+										return (
 										<div
 											key={entry.id}
-											className={`bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 transition-all duration-300 border border-gray-700/50 hover:border-gray-600 ${multiSelectMode ? 'flex items-center gap-3' : 'cursor-pointer hover:bg-gray-800/70'}`}
+											className={entryClasses}
 											{...(!multiSelectMode ? { onClick: () => setSelectedEntry(entry) } : {})}
 										>
 											{multiSelectMode && (
@@ -349,13 +383,18 @@ const HomePage: React.FC = () => {
 												/>
 											)}
 											<div className="flex items-start justify-between w-full">
-												<div className="flex-1">
-													<h3 className="font-medium text-gray-100 text-lg mb-1">
+												<div className={`flex-1 ${isQuickNote ? 'pr-3' : ''}`}>
+													<h3 className={`font-medium text-gray-100 ${isQuickNote ? 'text-base' : 'text-lg'} mb-1`}>
 														{entry.title}
+														{isQuickNote && isRecent && (
+															<span className="ml-2 text-xs px-2 py-0.5 bg-purple-500/70 rounded-full text-white">New</span>
+														)}
 													</h3>
-													<div className="text-xs italic text-gray-400 mb-2 line-clamp-1">
-														{entry.content ? (entry.content.length > 100 ? `${entry.content.substring(0, 100)}...` : entry.content) : ''}
-													</div>
+													{!isQuickNote && (
+														<div className="text-xs italic text-gray-400 mb-2 line-clamp-1">
+															{entry.content ? (entry.content.length > 100 ? `${entry.content.substring(0, 100)}...` : entry.content) : ''}
+														</div>
+													)}
 													<div className="flex items-center gap-3 text-sm text-gray-400">
 														<span className="flex items-center gap-1">
 															<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -364,19 +403,20 @@ const HomePage: React.FC = () => {
 															{entry.date}
 														</span>
 														<span className="flex items-center gap-1">
-															<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+															<svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isQuickNote ? 'text-indigo-400' : 'text-purple-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
 																<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
 															</svg>
 															{entry.folder}
 														</span>
 													</div>
 												</div>
-												<div className="text-2xl ml-4 bg-gray-900/50 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-700/50 flex items-center justify-center">
-													<MoodIcon mood={entry.mood} size="lg" />
+												<div className={`ml-4 bg-gray-900/50 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-700/50 flex items-center justify-center ${isQuickNote ? 'text-xl' : 'text-2xl'}`}>
+													<MoodIcon mood={entry.mood} size={isQuickNote ? "md" : "lg"} />
 												</div>
 											</div>
 										</div>
-									))}
+									);
+								})}
 											</div>
 										</div>
 									))
