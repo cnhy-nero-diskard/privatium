@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaRegSmile, FaRegLaugh, FaRegMeh, FaRegFrown, FaRegAngry } from 'react-icons/fa';
+import { Smile, Laugh, Meh, Frown, Angry } from 'lucide-react';
 import { getMoodDefinition, type MoodDefinition } from '@/utils/moodUtils';
 
 interface MoodIconProps {
@@ -9,13 +9,13 @@ interface MoodIconProps {
   className?: string;
 }
 
-// Map mood icon names to actual React Icons
+// Map mood icon names to Lucide React Icons
 const iconMap = {
-  FaRegLaugh: FaRegLaugh,
-  FaRegSmile: FaRegSmile,
-  FaRegMeh: FaRegMeh,
-  FaRegFrown: FaRegFrown,
-  FaRegAngry: FaRegAngry,
+  FaRegLaugh: Laugh,
+  FaRegSmile: Smile,
+  FaRegMeh: Meh,
+  FaRegFrown: Frown,
+  FaRegAngry: Angry,
 };
 
 const sizeClasses = {
@@ -43,23 +43,23 @@ export const MoodIcon: React.FC<MoodIconProps> = ({
   }
 
   const moodDef = getMoodDefinition(mood);
-  
+
   if (!moodDef) {
     // Fallback for unknown moods
+    const IconComponent = Meh;
     return (
       <span className={`text-gray-400 ${className}`}>
-        <FaRegMeh className={`inline ${sizeClasses[size]}`} />
+        <IconComponent className={`inline ${sizeClasses[size]}`} />
         {showLabel && <span className="ml-1">{mood}</span>}
       </span>
     );
   }
 
-  const IconComponent = iconMap[moodDef.icon as keyof typeof iconMap] || FaRegMeh;
+  const IconComponent = iconMap[moodDef.icon as keyof typeof iconMap] || Meh;
 
   return (
     <span className={`inline-flex items-center gap-1 ${moodDef.color} ${className}`}>
-      {/* Use emoji instead of icon for better visual appeal */}
-      <span className={emojiSizeClasses[size]}>{moodDef.emoji}</span>
+      <IconComponent className={sizeClasses[size]} />
       {showLabel && <span>{moodDef.label}</span>}
     </span>
   );

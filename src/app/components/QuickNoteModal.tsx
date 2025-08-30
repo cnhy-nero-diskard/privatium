@@ -83,21 +83,28 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({
     >
       <div
         ref={modalRef}
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md animate-modalEnter border border-gray-200 dark:border-gray-700"
+          className="bg-yellow-50 dark:bg-yellow-900 rounded-xl shadow-2xl p-6 w-full max-w-md animate-modalEnter border-2 border-yellow-300 dark:border-yellow-700 border-dashed"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">Add Quick Note</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-            aria-label="Close"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              {/* Sticky Note Icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <rect x="3" y="3" width="18" height="18" rx="3" fill="#FDE68A" stroke="#F59E0B" strokeWidth="2" />
+                <path d="M8 8h8M8 12h6" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <span className="text-xl font-bold text-yellow-800 dark:text-yellow-200">Quick Note</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -121,7 +128,7 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({
               How are you feeling?
             </label>
             <div className="flex justify-around">
-              {["happy", "neutral", "sad", "angry", "surprised"].map((moodType) => (
+              {["happy", "neutral", "sad", "angry"].map((moodType) => (
                 <button
                   key={moodType}
                   type="button"
