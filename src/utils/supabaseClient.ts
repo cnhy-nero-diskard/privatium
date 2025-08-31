@@ -97,10 +97,36 @@ async function decryptJournalData(journal: EncryptedJournalEntry): Promise<Journ
   };
 }
 
-export async function getJournals() {
+// Cache for etags and data
+let lastEtag: string | null = null;
+let lastData: JournalEntry[] | null = null;
+
+export async function getJournals(currentEtag?: string) {
   try {
     const supabase = getSupabaseClient();
     
+    // First, get the latest update timestamp from the journals table
+    const { data: latestUpdate, error: timestampError } = await supabase
+      .from('journals')
+      .select('updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+      
+    if (timestampError) {
+      console.error('Error getting latest update:', timestampError);
+      throw new Error(`Failed to check for updates: ${timestampError.message}`);
+    }
+    
+    // Generate new etag based on the latest update timestamp
+    const newEtag = latestUpdate?.updated_at || 'initial';
+    
+    // If the current etag matches the new one, return 304 (no change)
+    if (currentEtag && currentEtag === newEtag && lastData) {
+      return { status: 304, data: lastData };
+    }
+    
+    // If data has changed or we don't have cached data, fetch it
     const { data, error } = await supabase
       .from('journals')
       .select('*')
@@ -142,7 +168,15 @@ export async function getJournals() {
         console.warn('Some journals could not be decrypted properly');
       }
       
-      return decryptedJournals;
+      // Update the cache
+      lastEtag = newEtag;
+      lastData = decryptedJournals;
+      
+      return { 
+        status: 200, 
+        data: decryptedJournals,
+        etag: newEtag 
+      };
     } catch (decryptError) {
       console.error('Failed to decrypt journals:', JSON.stringify(decryptError, null, 2));
       throw new Error('Failed to decrypt journal entries. Your encryption key might be invalid.');

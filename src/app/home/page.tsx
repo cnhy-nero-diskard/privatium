@@ -10,6 +10,12 @@ import { MoodIcon } from "../components/MoodIcon";
 
 import { Tag } from '@/types/tags';
 
+interface ApiResponse {
+	status: number;
+	data: JournalEntry[];
+	etag?: string;
+}
+
 interface JournalEntry {
 	id: number;
 	title: string;
@@ -25,7 +31,7 @@ interface JournalEntry {
 
 const HomePage: React.FC = () => {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
-    const [loading, setLoading] = useState(true);
+	const [loading, setLoading] = useState(true);
     const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
@@ -33,14 +39,26 @@ const HomePage: React.FC = () => {
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteType, setDeleteType] = useState<'single' | 'multi'>('single');
-
-	const [error, setError] = useState<string | null>(null);
+    const [currentEtag, setCurrentEtag] = useState<string | null>(null);	const [error, setError] = useState<string | null>(null);
 
 	const fetchEntries = async () => {
 		setError(null);
 		setLoading(true);
 		try {
-			const data = await getJournals();
+			const response = await getJournals(currentEtag || undefined);
+			
+			// If status is 304, data hasn't changed, so we can keep using the current entries
+			if (response.status === 304) {
+				setLoading(false);
+				return;
+			}
+			
+			const { data, etag } = response as ApiResponse;
+			
+			// Update our etag
+			if (etag) {
+				setCurrentEtag(etag);
+			}
 			
 			// Check for decryption errors
 			const hasDecryptionErrors = data.some(entry => entry._decryptError);
@@ -50,7 +68,7 @@ const HomePage: React.FC = () => {
 			
 			// Load tags for each entry
 			const entriesWithTags = await Promise.all(
-				data.map(async (entry) => {
+				data.map(async entry => {
 					const tags = await getJournalTags(entry.id);
 					return { ...entry, content: entry.content ?? "", tags };
 				})
@@ -299,10 +317,110 @@ const HomePage: React.FC = () => {
 									</button>
 								</div>
 							)}
+							
+							{/* Quick Notes Section */}
+							{(() => {
+								const quickNotes = entries.filter(entry => 
+									(!entry.content || entry.content.trim() === '') && 
+									(!searchTerm || entry.title.toLowerCase().includes(searchTerm.toLowerCase())) &&
+									(!selectedFolder || entry.folder === selectedFolder)
+								);
+								
+								if (quickNotes.length > 0) {
+									return (
+										<div className="mb-8 pb-6 border-b border-gray-700/30">
+											<div className="flex items-center gap-2 mb-4">
+												<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+													<path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+													<path d="M8 11a1 1 0 100-2 1 1 0 000 2zm0 0a1 1 0 000 2m0-2a1 1 0 000-2m0 2a1 1 0 100 2m0-2v1m4-1a1 1 0 100-2 1 1 0 000 2zm0 0a1 1 0 000 2m0-2a1 1 0 000-2m0 2a1 1 0 100 2m0-2v1" />
+												</svg>
+												<h2 className="text-lg font-semibold text-amber-400">Quick Notes</h2>
+												<span className="text-xs px-2 py-0.5 bg-amber-900/50 text-amber-300 rounded-full">{quickNotes.length}</span>
+											</div>
+											
+											<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+												{quickNotes.map((entry) => {
+													const entryDate = new Date(entry.date);
+													const now = new Date();
+													const hoursSinceCreation = (now.getTime() - entryDate.getTime()) / (1000 * 60 * 60);
+													const isRecent = hoursSinceCreation <= 24;
+													
+													let entryClasses = `backdrop-blur-sm rounded-lg transition-all duration-300 border hover:border-amber-400 
+														${multiSelectMode ? 'flex items-center gap-3' : 'cursor-pointer'}`;
+													
+													entryClasses += isRecent 
+														? ' bg-gradient-to-br from-amber-500/80 to-orange-600/70 border-amber-400 border-dashed p-3 shadow-lg shadow-amber-700/20 transform hover:-translate-y-1'
+														: ' bg-gradient-to-br from-amber-600/40 to-orange-700/30 border-amber-500/30 border-dashed p-3 shadow hover:shadow-amber-700/10 transform hover:-translate-y-1';
+													
+													return (
+														<div
+															key={entry.id}
+															className={entryClasses}
+															{...(!multiSelectMode ? { onClick: () => setSelectedEntry(entry) } : {})}
+														>
+															{multiSelectMode && (
+																<input
+																	type="checkbox"
+																	checked={selectedIds.includes(entry.id)}
+																	onChange={() => toggleSelectEntry(entry.id)}
+																	className="form-checkbox h-5 w-5 text-blue-600"
+																	aria-label={`Select entry ${entry.title}`}
+																/>
+															)}
+															<div className="flex items-start justify-between w-full">
+																<div className="flex-1 pr-3">
+																	<div className="flex items-center gap-2 mb-1">
+																		<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-300" viewBox="0 0 20 20" fill="currentColor">
+																			<path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm3 1h6v4H7V5z" clipRule="evenodd" />
+																		</svg>
+																		<h3 className="font-medium text-gray-100 text-base tracking-wide">
+																			{entry.title}
+																			{isRecent && (
+																				<span className="ml-2 text-xs px-2 py-0.5 bg-amber-500 rounded-full text-white font-bold">New</span>
+																			)}
+																		</h3>
+																	</div>
+																	<div className="flex items-center gap-3 text-sm text-amber-100/80">
+																		<span className="flex items-center gap-1">
+																			<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+																			</svg>
+																			{entry.date}
+																		</span>
+																		<span className="flex items-center gap-1">
+																			<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+																			</svg>
+																			{entry.folder}
+																		</span>
+																	</div>
+																</div>
+																<div className="ml-4 bg-amber-700/40 backdrop-blur-sm p-2 rounded-full shadow-md border border-amber-500/40 flex items-center justify-center text-xl rotate-3 transform hover:rotate-0 transition-transform">
+																	<MoodIcon mood={entry.mood} size="md" />
+																</div>
+															</div>
+														</div>
+													);
+												})}
+											</div>
+										</div>
+									);
+								}
+								return null;
+							})()}
+
+							<h2 className="text-lg font-semibold text-blue-400 flex items-center gap-2 mb-4">
+								<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+								</svg>
+								Journal Entries
+							</h2>
 							<div className="space-y-6">
 								{Object.entries(
 									entries
 										.filter(entry =>
+											// Filter out quick notes as they're shown in their own section
+											(entry.content && entry.content.trim() !== '') &&
 											(!searchTerm || entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
 												entry.content?.toLowerCase().includes(searchTerm.toLowerCase())) &&
 											(!selectedFolder || entry.folder === selectedFolder)
@@ -358,10 +476,10 @@ const HomePage: React.FC = () => {
 										
 										// Apply different styling based on entry type
 										if (isQuickNote) {
-											// Quick note styling
+											// Quick note styling - completely different visual style
 											entryClasses += isRecent 
-											    ? ' bg-gradient-to-r from-purple-700/60 to-blue-700/60 border-purple-500/50 p-3'  // Recent note (highlighted)
-											    : ' bg-gray-800/30 border-gray-700/30 p-3'; // Older note (greyed out)
+											    ? ' bg-gradient-to-br from-amber-500/80 to-orange-600/70 border-amber-400 border-dashed p-3 shadow-lg shadow-amber-700/20 transform hover:-translate-y-1'  // Recent quick note
+											    : ' bg-gradient-to-br from-amber-600/40 to-orange-700/30 border-amber-500/30 border-dashed p-3 shadow hover:shadow-amber-700/10 transform hover:-translate-y-1'; // Older quick note
 										} else {
 											// Regular entry styling
 											entryClasses += ' bg-gray-800/50 border-gray-700/50 p-4 hover:bg-gray-800/70';
@@ -384,35 +502,71 @@ const HomePage: React.FC = () => {
 											)}
 											<div className="flex items-start justify-between w-full">
 												<div className={`flex-1 ${isQuickNote ? 'pr-3' : ''}`}>
-													<h3 className={`font-medium text-gray-100 ${isQuickNote ? 'text-base' : 'text-lg'} mb-1`}>
-														{entry.title}
-														{isQuickNote && isRecent && (
-															<span className="ml-2 text-xs px-2 py-0.5 bg-purple-500/70 rounded-full text-white">New</span>
-														)}
-													</h3>
-													{!isQuickNote && (
-														<div className="text-xs italic text-gray-400 mb-2 line-clamp-1">
-															{entry.content ? (entry.content.length > 100 ? `${entry.content.substring(0, 100)}...` : entry.content) : ''}
-														</div>
+													{isQuickNote ? (
+														<>
+															{/* Quick Note Style - More like a sticky note */}
+															<div className="flex items-center gap-2 mb-1">
+																{/* Sticky Note Icon */}
+																<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-300" viewBox="0 0 20 20" fill="currentColor">
+																	<path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm3 1h6v4H7V5z" clipRule="evenodd" />
+																</svg>
+																<h3 className="font-medium text-gray-100 text-base tracking-wide">
+																	{entry.title}
+																	{isRecent && (
+																		<span className="ml-2 text-xs px-2 py-0.5 bg-amber-500 rounded-full text-white font-bold">New</span>
+																	)}
+																</h3>
+															</div>
+															<div className="flex items-center gap-3 text-sm text-amber-100/80">
+																<span className="flex items-center gap-1">
+																	<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+																	</svg>
+																	{entry.date}
+																</span>
+																<span className="flex items-center gap-1">
+																	<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+																	</svg>
+																	{entry.folder}
+																</span>
+															</div>
+														</>
+													) : (
+														<>
+															{/* Regular Entry Style */}
+															<h3 className="font-medium text-gray-100 text-lg mb-1">
+																{entry.title}
+															</h3>
+															<div className="text-xs italic text-gray-400 mb-2 line-clamp-1">
+																{entry.content ? (entry.content.length > 100 ? `${entry.content.substring(0, 100)}...` : entry.content) : ''}
+															</div>
+															<div className="flex items-center gap-3 text-sm text-gray-400">
+																<span className="flex items-center gap-1">
+																	<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+																	</svg>
+																	{entry.date}
+																</span>
+																<span className="flex items-center gap-1">
+																	<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+																	</svg>
+																	{entry.folder}
+																</span>
+															</div>
+														</>
 													)}
-													<div className="flex items-center gap-3 text-sm text-gray-400">
-														<span className="flex items-center gap-1">
-															<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-															</svg>
-															{entry.date}
-														</span>
-														<span className="flex items-center gap-1">
-															<svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isQuickNote ? 'text-indigo-400' : 'text-purple-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-															</svg>
-															{entry.folder}
-														</span>
+												</div>
+												{isQuickNote ? (
+													<div className="ml-4 bg-amber-700/40 backdrop-blur-sm p-2 rounded-full shadow-md border border-amber-500/40 flex items-center justify-center text-xl rotate-3 transform hover:rotate-0 transition-transform">
+														<MoodIcon mood={entry.mood} size="md" />
 													</div>
-												</div>
-												<div className={`ml-4 bg-gray-900/50 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-700/50 flex items-center justify-center ${isQuickNote ? 'text-xl' : 'text-2xl'}`}>
-													<MoodIcon mood={entry.mood} size={isQuickNote ? "md" : "lg"} />
-												</div>
+												) : (
+													<div className="ml-4 bg-gray-900/50 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-700/50 flex items-center justify-center text-2xl">
+														<MoodIcon mood={entry.mood} size="lg" />
+													</div>
+												)}
 											</div>
 										</div>
 									);
@@ -422,6 +576,33 @@ const HomePage: React.FC = () => {
 									))
 								}
 							</div>
+							
+							{/* No journal entries message */}
+							{(() => {
+								const hasQuickNotes = entries.some(entry => !entry.content || entry.content.trim() === '');
+								const hasJournalEntries = entries.some(entry => entry.content && entry.content.trim() !== '');
+								
+								// Show "No journal entries" message only when displaying that section and there are no matching entries
+								if (!hasJournalEntries && 
+									entries.length > 0 && 
+									(!searchTerm || searchTerm.trim() === '') && 
+									(!selectedFolder || selectedFolder === '')) {
+									return (
+										<div className="text-center py-8 border border-gray-700/20 rounded-lg bg-gray-800/20 mb-8">
+											<svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+											</svg>
+											<p className="text-gray-400 text-lg mb-2">
+												No journal entries yet
+											</p>
+											<p className="text-gray-500 text-sm">
+												{hasQuickNotes ? "You have some quick notes above. Try expanding them into full journal entries!" : "Start by adding your first entry!"}
+											</p>
+										</div>
+									);
+								}
+								return null;
+							})()}
 						</>
 					)}
 					
