@@ -7,6 +7,7 @@ import { getJournals, updateJournal, deleteJournal } from "@/utils/supabaseClien
 import { getJournalTags } from "@/utils/tagUtils";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { MoodIcon } from "../components/MoodIcon";
+import ExportButton from "@/components/ExportButton";
 
 import { Tag } from '@/types/tags';
 
@@ -186,7 +187,7 @@ const HomePage: React.FC = () => {
 							Welcome to Your Digital Journal
 						</h1>
 						<p className="text-gray-600 dark:text-gray-300 text-lg max-w-2xl mx-auto">
-							A safe space to capture your thoughts, memories, and reflections.
+							Built with privacy
 						</p>
 					</div>
 
@@ -211,6 +212,7 @@ const HomePage: React.FC = () => {
 										<option key={folder} value={folder}>{folder}</option>
 									))}
 								</select>
+								<ExportButton />
 								<button
 									className={`px-4 py-2 rounded-lg font-semibold shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 flex items-center gap-2 ${multiSelectMode ? 'text-red-600' : 'text-blue-600'} hover:bg-gradient-to-r hover:from-red-700 hover:via-pink-700 hover:to-purple-800 hover:text-white`}
 									onClick={() => {
