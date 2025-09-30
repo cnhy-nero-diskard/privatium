@@ -8,6 +8,8 @@ import { getJournalTags } from "@/utils/tagUtils";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { MoodIcon } from "../components/MoodIcon";
 import ExportButton from "@/components/ExportButton";
+import AITherapistSummary from "../components/AITherapistSummary";
+import { groupEntriesByMonth, formatMonthKey, getEntriesForMonth, getCurrentMonthKey } from "@/utils/dateUtils";
 
 import { Tag } from '@/types/tags';
 
@@ -41,6 +43,9 @@ const HomePage: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteType, setDeleteType] = useState<'single' | 'multi'>('single');
     const [currentEtag, setCurrentEtag] = useState<string | null>(null);	const [error, setError] = useState<string | null>(null);
+    const [showAISection, setShowAISection] = useState(false);
+    const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthKey());
+    const [monthlyEntries, setMonthlyEntries] = useState<JournalEntry[]>([]);
 
 	const fetchEntries = async () => {
 		setError(null);
@@ -110,6 +115,16 @@ const HomePage: React.FC = () => {
 		
 		return () => clearInterval(refreshInterval);
 	}, []);
+
+	// Update monthly entries when selected month or entries change
+	useEffect(() => {
+		if (entries.length > 0 && selectedMonth) {
+			const filteredEntries = getEntriesForMonth(entries, selectedMonth);
+			setMonthlyEntries(filteredEntries);
+		} else {
+			setMonthlyEntries([]);
+		}
+	}, [entries, selectedMonth]);
 
 	// Handler for editing an entry
 	const handleEdit = async (updatedEntry: any) => {
@@ -182,16 +197,63 @@ const HomePage: React.FC = () => {
 			<TopNavigation />
 			<main className="min-h-screen bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col items-center pt-24 px-4">
 				<div className="w-full max-w-4xl">
-					<div className="text-center mb-12 animate-fadeIn">
-						<h1 className="text-4xl font-bold mb-4 text-gray-800 dark:text-gray-100 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-							Welcome to Your Digital Journal
-						</h1>
-						<p className="text-gray-600 dark:text-gray-300 text-lg max-w-2xl mx-auto">
-							Built with privacy
-						</p>
+				<div className="text-center mb-12 animate-fadeIn">
+					<h1 className="text-4xl font-bold mb-4 text-gray-800 dark:text-gray-100 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
+						Welcome to Your Digital Journal
+					</h1>
+					<p className="text-gray-600 dark:text-gray-300 text-lg max-w-2xl mx-auto">
+						Built with privacy
+					</p>
+					<div className="mt-6">
+						<button
+							onClick={() => setShowAISection(!showAISection)}
+							className={`px-4 py-2 rounded-lg font-medium shadow-lg ${showAISection ? 'bg-purple-700 text-white' : 'bg-white/80 dark:bg-gray-800/80 text-purple-700 dark:text-purple-400'} hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all duration-200 flex items-center gap-2 mx-auto`}
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+								<path d="M11.7 2.805a.75.75 0 01.6 0A60.65 60.65 0 0122.83 8.72a.75.75 0 01-.231 1.337 49.949 49.949 0 00-9.902 3.912l-.003.002-.34.18a.75.75 0 01-.707 0A50.009 50.009 0 001.73 10.057a.75.75 0 01-.231-1.337 60.653 60.653 0 0110.2-5.915z" />
+								<path d="M13.06 15.473a48.45 48.45 0 017.666-3.282c.134 1.414.22 2.843.255 4.285a.75.75 0 01-.46.71 47.878 47.878 0 00-8.105 4.342.75.75 0 01-.832 0 47.877 47.877 0 00-8.104-4.342.75.75 0 01-.461-.71c.035-1.442.121-2.87.255-4.286A48.4 48.4 0 016 13.18a1.5 1.5 0 00-.14-2.508 49.03 49.03 0 00-4.45-2.26.75.75 0 01-.435-.685c.033-1.982.166-3.952.397-5.903a.75.75 0 01.66-.664A48.448 48.448 0 0117.25 5.75a.75.75 0 01.665.665 48.497 48.497 0 01.396 5.903.75.75 0 01-.434.686c-.546.275-1.084.56-1.617.849A1.5 1.5 0 0016 13.18a49.03 49.03 0 003.342 1.68.75.75 0 01.461.71 49.384 49.384 0 00-.254 4.287.75.75 0 01-.46.71 47.878 47.878 0 00-8.105 4.342.75.75 0 01-.832 0 47.877 47.877 0 00-8.104-4.342.75.75 0 01-.461-.71c.035-1.443.12-2.871.254-4.286a.75.75 0 01.46-.709 49.368 49.368 0 003.341-1.681A1.5 1.5 0 005 13.18a48.45 48.45 0 01-4.309-2.233.75.75 0 01-.435-.684c.033-1.982.166-3.952.397-5.903a.75.75 0 01.665-.665A48.449 48.449 0 0118 5.75a.75.75 0 01.665.665 48.449 48.449 0 01.396 5.903.75.75 0 01-.435.684 48.978 48.978 0 01-4.31 2.233 1.5 1.5 0 00-.139 2.509z" />
+							</svg>
+							{showAISection ? 'Hide AI Therapist' : 'Show AI Therapist'}
+						</button>
 					</div>
-
-				<div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 mb-8 transition-all duration-300 hover:shadow-xl">
+				</div>
+				
+				{showAISection && (
+					<div className="mb-8 animate-fadeIn">
+						<div className="flex flex-wrap items-center justify-between mb-4">
+							<h2 className="text-xl font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-2">
+								AI Therapist Insights
+							</h2>
+							
+							<div className="flex items-center space-x-2">
+								<label htmlFor="month-select" className="text-sm text-gray-600 dark:text-gray-300">
+									Select Month:
+								</label>
+								<select
+									id="month-select"
+									value={selectedMonth}
+									onChange={(e) => setSelectedMonth(e.target.value)}
+									className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400 dark:bg-gray-700 dark:border-gray-600"
+								>
+									{Object.keys(groupEntriesByMonth(entries))
+										.sort((a, b) => b.localeCompare(a))
+										.map((monthKey) => (
+											<option key={monthKey} value={monthKey}>
+												{formatMonthKey(monthKey)}
+											</option>
+										))
+									}
+								</select>
+							</div>
+						</div>
+						
+						<AITherapistSummary 
+							entries={monthlyEntries} 
+							month={formatMonthKey(selectedMonth).split(' ')[0]} 
+							year={parseInt(selectedMonth.split('-')[0])} 
+						/>
+					</div>
+				)}				<div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 mb-8 transition-all duration-300 hover:shadow-xl">
 					<div className="flex flex-wrap justify-between items-center gap-4 mb-6">
 						<div className="flex-1">
 							<div className="flex gap-4 flex-wrap items-center">
