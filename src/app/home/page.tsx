@@ -107,13 +107,6 @@ const HomePage: React.FC = () => {
 
 	useEffect(() => {
 		fetchEntries();
-		
-		// Set up refresh interval to check for new notes (optional)
-		const refreshInterval = setInterval(() => {
-			fetchEntries();
-		}, 60000); // Refresh every minute
-		
-		return () => clearInterval(refreshInterval);
 	}, []);
 
 	// Update monthly entries when selected month or entries change
