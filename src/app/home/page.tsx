@@ -377,8 +377,11 @@ const HomePage: React.FC = () => {
 							
 							{/* Quick Notes Section */}
 							{(() => {
+								const isSameDay = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
+
 								const quickNotes = entries.filter(entry => 
 									(!entry.content || entry.content.trim() === '') && 
+									isSameDay(entry.date) &&
 									(!searchTerm || entry.title.toLowerCase().includes(searchTerm.toLowerCase())) &&
 									(!selectedFolder || entry.folder === selectedFolder)
 								);
@@ -636,7 +639,8 @@ const HomePage: React.FC = () => {
 							
 							{/* No journal entries message */}
 							{(() => {
-								const hasQuickNotes = entries.some(entry => !entry.content || entry.content.trim() === '');
+								const isSameDay = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
+								const hasQuickNotes = entries.some(entry => (!entry.content || entry.content.trim() === '') && isSameDay(entry.date));
 								const hasJournalEntries = entries.some(entry => entry.content && entry.content.trim() !== '');
 								
 								// Show "No journal entries" message only when displaying that section and there are no matching entries
