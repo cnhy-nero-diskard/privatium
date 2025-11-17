@@ -8,6 +8,7 @@ import { getJournalTags } from "@/utils/tagUtils";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { MoodIcon } from "../components/MoodIcon";
 import ExportButton from "@/components/ExportButton";
+import ImportButton from "@/components/ImportButton";
 import AITherapistSummary from "../components/AITherapistSummary";
 import { groupEntriesByMonth, formatMonthKey, getEntriesForMonth, getCurrentMonthKey } from "@/utils/dateUtils";
 import FilterSidebar from "../components/FilterSidebar";
@@ -340,6 +341,7 @@ const HomePage: React.FC = () => {
 									className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 w-64"
 								/>
 								<ExportButton />
+								<ImportButton onImportComplete={fetchEntries} />
 								<button
 									className={`px-4 py-2 rounded-lg font-semibold shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 flex items-center gap-2 ${multiSelectMode ? 'text-red-600' : 'text-blue-600'} hover:bg-gradient-to-r hover:from-red-700 hover:via-pink-700 hover:to-purple-800 hover:text-white`}
 									onClick={() => {
