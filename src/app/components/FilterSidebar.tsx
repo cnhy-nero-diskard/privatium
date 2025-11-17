@@ -527,9 +527,9 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
                       />
                       <button
                         onClick={() => onFolderChange(isSelected ? null : folder.name)}
-                        className="flex-1 text-left flex items-center justify-between"
+                        className="flex-1 min-w-0 text-left flex items-center justify-between"
                       >
-                        <span className="text-sm truncate">{folder.name}</span>
+                        <span className="text-sm truncate flex-1">{folder.name}</span>
                         <span className="text-xs px-2 py-0.5 bg-gray-600 rounded-full ml-2">
                           {entryCount}
                         </span>
@@ -615,7 +615,7 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
                   <button
                     key={tag}
                     onClick={() => onTagToggle(tag)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
+                    className={`w-full min-w-0 text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
                       isSelected
                         ? "bg-green-500/20 text-green-300"
                         : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
@@ -666,15 +666,15 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
                   <button
                     key={mood}
                     onClick={() => onMoodToggle(mood)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
+                    className={`w-full min-w-0 text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
                       isSelected
                         ? "bg-yellow-500/20 text-yellow-300"
                         : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
                     }`}
                   >
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       <MoodIcon mood={mood} size="sm" />
-                      <span className="text-sm truncate">{mood}</span>
+                      <span className="text-sm truncate flex-1">{mood}</span>
                     </div>
                     <span className="text-xs px-2 py-0.5 bg-gray-600 rounded-full ml-2">
                       {count}
