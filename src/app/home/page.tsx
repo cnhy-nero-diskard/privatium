@@ -10,6 +10,7 @@ import { MoodIcon } from "../components/MoodIcon";
 import ExportButton from "@/components/ExportButton";
 import AITherapistSummary from "../components/AITherapistSummary";
 import { groupEntriesByMonth, formatMonthKey, getEntriesForMonth, getCurrentMonthKey } from "@/utils/dateUtils";
+import FilterSidebar from "../components/FilterSidebar";
 
 import { Tag } from '@/types/tags';
 
@@ -46,6 +47,11 @@ const HomePage: React.FC = () => {
     const [showAISection, setShowAISection] = useState(false);
     const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthKey());
     const [monthlyEntries, setMonthlyEntries] = useState<JournalEntry[]>([]);
+	
+	// Filter states
+	const [selectedDate, setSelectedDate] = useState<string | null>(null);
+	const [selectedTags, setSelectedTags] = useState<string[]>([]);
+	const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
 
 	const fetchEntries = async () => {
 		setError(null);
@@ -185,11 +191,87 @@ const HomePage: React.FC = () => {
 	// Deselect all
 	const deselectAll = () => setSelectedIds([]);
 
+	// Filter handlers
+	const handleDateChange = (date: string | null) => {
+		setSelectedDate(date);
+	};
+
+	const handleFolderChange = (folder: string | null) => {
+		setSelectedFolder(folder);
+	};
+
+	const handleTagToggle = (tag: string) => {
+		setSelectedTags(prev =>
+			prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+		);
+	};
+
+	const handleMoodToggle = (mood: string) => {
+		setSelectedMoods(prev =>
+			prev.includes(mood) ? prev.filter(m => m !== mood) : [...prev, mood]
+		);
+	};
+
+	const handleClearFilters = () => {
+		setSelectedDate(null);
+		setSelectedFolder(null);
+		setSelectedTags([]);
+		setSelectedMoods([]);
+		setSearchTerm("");
+	};
+
+	// Filter entries based on all active filters
+	const filteredEntries = entries.filter(entry => {
+		// Search term filter
+		if (searchTerm && !entry.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
+			!entry.content?.toLowerCase().includes(searchTerm.toLowerCase())) {
+			return false;
+		}
+
+		// Date filter
+		if (selectedDate && entry.date !== selectedDate) {
+			return false;
+		}
+
+		// Folder filter
+		if (selectedFolder && entry.folder !== selectedFolder) {
+			return false;
+		}
+
+		// Tags filter (entry must have at least one of the selected tags)
+		if (selectedTags.length > 0) {
+			const entryTagNames = entry.tags?.map(t => t.name) || [];
+			if (!selectedTags.some(tag => entryTagNames.includes(tag))) {
+				return false;
+			}
+		}
+
+		// Moods filter
+		if (selectedMoods.length > 0 && !selectedMoods.includes(entry.mood)) {
+			return false;
+		}
+
+		return true;
+	});
+
 	return (
 		<>
 			<TopNavigation />
-			<main className="min-h-screen bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col items-center pt-24 px-4">
-				<div className="w-full max-w-4xl">
+			<main className="min-h-screen bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex pt-24">
+				<FilterSidebar
+					entries={entries}
+					selectedDate={selectedDate}
+					selectedFolder={selectedFolder}
+					selectedTags={selectedTags}
+					selectedMoods={selectedMoods}
+					onDateChange={handleDateChange}
+					onFolderChange={handleFolderChange}
+					onTagToggle={handleTagToggle}
+					onMoodToggle={handleMoodToggle}
+					onClearFilters={handleClearFilters}
+				/>
+				<div className="flex-1 px-4 lg:px-8 overflow-x-hidden">
+				<div className="w-full max-w-4xl mx-auto">
 				<div className="text-center mb-12 animate-fadeIn">
 					<h1 className="text-4xl font-bold mb-4 text-gray-800 dark:text-gray-100 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
 						Welcome to Your Digital Journal
@@ -257,16 +339,6 @@ const HomePage: React.FC = () => {
 									onChange={(e) => setSearchTerm(e.target.value)}
 									className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 w-64"
 								/>
-								<select
-									value={selectedFolder || ""}
-									onChange={(e) => setSelectedFolder(e.target.value || null)}
-									className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
-								>
-									<option value="">All Folders</option>
-									{Array.from(new Set(entries.map(entry => entry.folder))).map(folder => (
-										<option key={folder} value={folder}>{folder}</option>
-									))}
-								</select>
 								<ExportButton />
 								<button
 									className={`px-4 py-2 rounded-lg font-semibold shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 flex items-center gap-2 ${multiSelectMode ? 'text-red-600' : 'text-blue-600'} hover:bg-gradient-to-r hover:from-red-700 hover:via-pink-700 hover:to-purple-800 hover:text-white`}
@@ -296,13 +368,7 @@ const HomePage: React.FC = () => {
 											className="px-4 py-2 rounded-lg bg-blue-500 text-white font-semibold shadow-lg ml-2"
 											type="button"
 											onClick={() => {
-												const filtered = entries
-													.filter(entry =>
-														(!searchTerm || entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-															entry.content?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-														(!selectedFolder || entry.folder === selectedFolder)
-													);
-												selectAllVisible(filtered);
+												selectAllVisible(filteredEntries);
 											}}
 										>Select All</button>
 										<button
@@ -379,11 +445,8 @@ const HomePage: React.FC = () => {
 							{(() => {
 								const isSameDay = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
 
-								const quickNotes = entries.filter(entry => 
-									(!entry.content || entry.content.trim() === '') && 
-									isSameDay(entry.date) &&
-									(!searchTerm || entry.title.toLowerCase().includes(searchTerm.toLowerCase())) &&
-									(!selectedFolder || entry.folder === selectedFolder)
+								const quickNotes = filteredEntries.filter(entry => 
+									(!entry.content || entry.content.trim() === '')
 								);
 								
 								if (quickNotes.length > 0) {
@@ -477,15 +540,12 @@ const HomePage: React.FC = () => {
 							</h2>
 							<div className="space-y-6">
 								{Object.entries(
-									entries
+									filteredEntries
 										.filter(entry =>
 											// Filter out quick notes as they're shown in their own section
-											(entry.content && entry.content.trim() !== '') &&
-											(!searchTerm || entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-												entry.content?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-											(!selectedFolder || entry.folder === selectedFolder)
+											(entry.content && entry.content.trim() !== '')
 										)
-										.reduce((groups: { [key: string]: typeof entries }, entry) => {
+										.reduce((groups: { [key: string]: typeof filteredEntries }, entry) => {
 											const date = new Date(entry.date);
 											const today = new Date();
 											const yesterday = new Date(today);
@@ -640,14 +700,11 @@ const HomePage: React.FC = () => {
 							{/* No journal entries message */}
 							{(() => {
 								const isSameDay = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
-								const hasQuickNotes = entries.some(entry => (!entry.content || entry.content.trim() === '') && isSameDay(entry.date));
-								const hasJournalEntries = entries.some(entry => entry.content && entry.content.trim() !== '');
+								const hasQuickNotes = filteredEntries.some(entry => (!entry.content || entry.content.trim() === ''));
+								const hasJournalEntries = filteredEntries.some(entry => entry.content && entry.content.trim() !== '');
 								
 								// Show "No journal entries" message only when displaying that section and there are no matching entries
-								if (!hasJournalEntries && 
-									entries.length > 0 && 
-									(!searchTerm || searchTerm.trim() === '') && 
-									(!selectedFolder || selectedFolder === '')) {
+								if (!hasJournalEntries && filteredEntries.length > 0) {
 									return (
 										<div className="text-center py-8 border border-gray-700/20 rounded-lg bg-gray-800/20 mb-8">
 											<svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -687,6 +744,7 @@ const HomePage: React.FC = () => {
 						count={deleteType === 'multi' ? selectedIds.length : undefined}
 					/>
 				</div>
+			</div>
 			</div>
 		</main>
 		</>
