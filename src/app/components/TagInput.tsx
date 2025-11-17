@@ -89,7 +89,7 @@ export function TagInput({ selectedTags, onChange }: TagInputProps) {
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder={loading ? 'Loading tags...' : 'Type a tag and press Enter...'}
+          placeholder={loading ? 'Loading tags...' : 'Type a tag...'}
           className="flex-grow min-w-[120px] p-1 bg-transparent outline-none"
           disabled={loading}
         />
