@@ -1,6 +1,33 @@
-# CSV Import Feature
+# CSV Import & Export Feature
 
 ## Overview
+The import/export feature allows you to backup your journal entries and import entries from other apps or backup files. The system supports both JSON and CSV formats, with CSV being the universal format that works across different journaling applications.
+
+## Export Feature
+
+### Export Formats
+You can export your journal entries in two formats:
+
+#### JSON Format
+- **Use Case**: Full backup with complete metadata
+- **Features**: Includes all entry data, timestamps, and structured information
+- **File**: `privatium-journal-export-YYYY-MM-DD.json`
+
+#### CSV Format
+- **Use Case**: Universal format for importing into other apps or spreadsheets
+- **Features**: Compatible with Excel, Google Sheets, and other journaling apps
+- **File**: `privatium-journal-export-YYYY-MM-DD.csv`
+- **Format**: Uses proper CSV escaping with comma-separated tags
+
+### How to Export
+1. Click the "Export" button on the home page
+2. Click the dropdown arrow to select your preferred format (JSON or CSV)
+3. Click the main export button to download
+4. File will be saved with the current date in the filename
+
+## Import Feature
+
+### Overview
 The CSV import feature allows you to import journal entries from other apps or backup files. The system automatically detects duplicate entries and lets you choose whether to skip them or overwrite existing entries.
 
 ## CSV Format
