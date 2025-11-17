@@ -11,8 +11,7 @@ import { logMoodSelection, logSaveAttempt } from "@/utils/debugMood";
 import { getEntryState, clearEntryState } from "@/utils/entryStateManager";
 import { TagInput } from "@/app/components/TagInput";
 import { Tag } from "@/types/tags";
-
-const FOLDER_OPTIONS = ["Personal", "Work", "Ideas", "Archive"];
+import { getFolders, type Folder } from "@/utils/folderUtils";
 
 function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
@@ -64,9 +63,27 @@ const EntryForm: React.FC = () => {
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [title, setTitle] = useState<string>('');
   const [content, setContent] = useState<string>(initialValue);
-  const [folder, setFolder] = useState<string>(FOLDER_OPTIONS[0]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [folder, setFolder] = useState<string>('');
   const [wordCount, setWordCount] = useState<number>(0);
   const [charCount, setCharCount] = useState<number>(0);
+
+  // Load folders on mount
+  useEffect(() => {
+    const loadFolders = async () => {
+      try {
+        const loadedFolders = await getFolders();
+        setFolders(loadedFolders);
+        // Set default folder if not editing
+        if (!isEdit && loadedFolders.length > 0) {
+          setFolder(loadedFolders[0].name);
+        }
+      } catch (error) {
+        console.error("Failed to load folders:", error);
+      }
+    };
+    loadFolders();
+  }, [isEdit]);
 
   // Calculate word and character counts whenever content changes
   useEffect(() => {
@@ -86,7 +103,7 @@ const EntryForm: React.FC = () => {
           setDate(entryState.date || formatDate(today));
           setTitle(entryState.title || '');
           setContent(entryState.content || '');
-          setFolder(entryState.folder || FOLDER_OPTIONS[0]);
+          setFolder(entryState.folder || '');
           if (entryState.mood) setMood(entryState.mood);
           if (entryState.tags) setSelectedTags(entryState.tags);
           // Clear the state after loading
@@ -390,8 +407,8 @@ const EntryForm: React.FC = () => {
                 value={folder}
                 onChange={(e) => setFolder(e.target.value)}
               >
-                {FOLDER_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.name}>{f.name}</option>
                 ))}
               </select>
             </div>

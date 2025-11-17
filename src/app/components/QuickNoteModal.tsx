@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createJournal } from "@/utils/supabaseClient";
 import { MoodIcon } from "./MoodIcon";
+import { getFolders, createFolder, type Folder } from "@/utils/folderUtils";
 
 interface QuickNoteModalProps {
   isOpen: boolean;
@@ -16,8 +17,35 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({
   const [title, setTitle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mood, setMood] = useState("neutral");
+  const [notesFolder, setNotesFolder] = useState<string>("Notes");
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load or create Notes folder
+  useEffect(() => {
+    const ensureNotesFolder = async () => {
+      try {
+        const folders = await getFolders();
+        const notesFolderObj = folders.find(f => f.name === "Notes");
+        
+        if (notesFolderObj) {
+          setNotesFolder(notesFolderObj.name);
+        } else if (folders.length > 0) {
+          // Use first folder if Notes doesn't exist
+          setNotesFolder(folders[0].name);
+        } else {
+          // Create a Notes folder if no folders exist
+          const newFolder = await createFolder("Notes", "#FCD34D"); // Yellow color for notes
+          setNotesFolder(newFolder.name);
+        }
+      } catch (error) {
+        console.error("Failed to load/create Notes folder:", error);
+        setNotesFolder("Notes"); // Fallback
+      }
+    };
+    
+    ensureNotesFolder();
+  }, []);
 
   useEffect(() => {
     // When modal opens, focus the input field
@@ -57,7 +85,7 @@ const QuickNoteModal: React.FC<QuickNoteModalProps> = ({
         title: title.trim(),
         content: "", // No content for quick notes
         date: dateString,
-        folder: "Notes",
+        folder: notesFolder,
         mood: mood
       });
       

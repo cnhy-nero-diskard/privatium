@@ -1,8 +1,11 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { MoodIcon } from "./MoodIcon";
 import { MOOD_DEFINITIONS } from "@/utils/moodUtils";
 import { Tag } from "@/types/tags";
+import ExportButton from "@/components/ExportButton";
+import ImportButton from "@/components/ImportButton";
+import { getFolders, createFolder, deleteFolder, updateFolder, type Folder } from "@/utils/folderUtils";
 
 interface JournalEntry {
   id: number;
@@ -25,6 +28,7 @@ interface FilterSidebarProps {
   onTagToggle: (tag: string) => void;
   onMoodToggle: (mood: string) => void;
   onClearFilters: () => void;
+  onImportComplete: () => void;
 }
 
 interface CollapsibleSectionProps {
@@ -92,12 +96,83 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onTagToggle,
   onMoodToggle,
   onClearFilters,
+  onImportComplete,
 }) => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isFoldersOpen, setIsFoldersOpen] = useState(true);
   const [isTagsOpen, setIsTagsOpen] = useState(true);
   const [isMoodsOpen, setIsMoodsOpen] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Start collapsed by default
+  
+  // Folder management states
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [isAddingFolder, setIsAddingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderColor, setNewFolderColor] = useState("#3B82F6");
+  const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
+  const [editFolderName, setEditFolderName] = useState("");
+  const [editFolderColor, setEditFolderColor] = useState("#3B82F6");
+  
+  // Load folders on mount
+  useEffect(() => {
+    loadFolders();
+  }, []);
+  
+  const loadFolders = async () => {
+    try {
+      const loadedFolders = await getFolders();
+      setFolders(loadedFolders);
+    } catch (error) {
+      console.error("Failed to load folders:", error);
+    }
+  };
+  
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    
+    try {
+      await createFolder(newFolderName.trim(), newFolderColor);
+      setNewFolderName("");
+      setNewFolderColor("#3B82F6");
+      setIsAddingFolder(false);
+      await loadFolders();
+    } catch (error) {
+      console.error("Failed to create folder:", error);
+    }
+  };
+  
+  const handleDeleteFolder = async (folderId: number) => {
+    if (!confirm("Are you sure you want to delete this folder? Entries in this folder will not be deleted.")) {
+      return;
+    }
+    
+    try {
+      await deleteFolder(folderId);
+      await loadFolders();
+    } catch (error) {
+      console.error("Failed to delete folder:", error);
+    }
+  };
+  
+  const handleUpdateFolder = async (folderId: number) => {
+    if (!editFolderName.trim()) return;
+    
+    try {
+      await updateFolder(folderId, editFolderName.trim(), editFolderColor);
+      setEditingFolderId(null);
+      setEditFolderName("");
+      setEditFolderColor("#3B82F6");
+      await loadFolders();
+    } catch (error) {
+      console.error("Failed to update folder:", error);
+    }
+  };
+  
+  const startEditFolder = (folder: Folder) => {
+    setEditingFolderId(folder.id);
+    setEditFolderName(folder.name);
+    setEditFolderColor(folder.color);
+  };
 
   // Calculate folder statistics
   const folderStats = useMemo(() => {
@@ -211,6 +286,20 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
           </p>
         </div>
 
+        {/* Import/Export Section */}
+        <div className="p-4 border-b border-gray-700/30 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            Data Management
+          </h3>
+          <div className="space-y-2">
+            <ExportButton />
+            <ImportButton onImportComplete={onImportComplete} />
+          </div>
+        </div>
+
         {/* Calendar Section */}
         <CollapsibleSection
           title="Calendar"
@@ -295,34 +384,201 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
           }
           isOpen={isFoldersOpen}
           onToggle={() => setIsFoldersOpen(!isFoldersOpen)}
-          count={folderStats.length}
+          count={folders.length}
         >
-          <div className="space-y-1">
-            {folderStats.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">
-                No folders yet
-              </p>
+          <div className="space-y-2">
+            {/* Add folder button */}
+            {!isAddingFolder ? (
+              <button
+                onClick={() => setIsAddingFolder(true)}
+                className="w-full px-3 py-2 bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Add Folder
+              </button>
             ) : (
-              folderStats.map(({ folder, count }) => {
-                const isSelected = selectedFolder === folder;
-                return (
+              <div className="space-y-2 p-2 bg-gray-700/50 rounded-lg">
+                <input
+                  type="text"
+                  placeholder="Folder name"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-purple-400 focus:border-transparent"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateFolder();
+                    if (e.key === "Escape") {
+                      setIsAddingFolder(false);
+                      setNewFolderName("");
+                      setNewFolderColor("#3B82F6");
+                    }
+                  }}
+                  autoFocus
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={newFolderColor}
+                    onChange={(e) => setNewFolderColor(e.target.value)}
+                    className="w-12 h-8 rounded cursor-pointer border border-gray-500"
+                  />
                   <button
-                    key={folder}
-                    onClick={() => onFolderChange(isSelected ? null : folder)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
-                      isSelected
-                        ? "bg-purple-500/20 text-purple-300"
-                        : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
-                    }`}
+                    onClick={handleCreateFolder}
+                    className="flex-1 px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
                   >
-                    <span className="text-sm truncate flex-1">{folder}</span>
-                    <span className="text-xs px-2 py-0.5 bg-gray-600 rounded-full ml-2">
-                      {count}
-                    </span>
+                    Create
                   </button>
-                );
-              })
+                  <button
+                    onClick={() => {
+                      setIsAddingFolder(false);
+                      setNewFolderName("");
+                      setNewFolderColor("#3B82F6");
+                    }}
+                    className="px-3 py-1.5 bg-gray-600 text-gray-300 rounded-lg hover:bg-gray-500 transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
+            
+            {/* Folder list */}
+            <div className="space-y-1">
+              {folders.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No folders yet
+                </p>
+              ) : (
+                folders.map((folder) => {
+                  const entryCount = entries.filter((e) => e.folder === folder.name).length;
+                  const isSelected = selectedFolder === folder.name;
+                  const isEditing = editingFolderId === folder.id;
+                  
+                  if (isEditing) {
+                    return (
+                      <div key={folder.id} className="space-y-2 p-2 bg-gray-700/50 rounded-lg border-2 border-purple-500/30">
+                        <input
+                          type="text"
+                          value={editFolderName}
+                          onChange={(e) => setEditFolderName(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-gray-100 focus:ring-2 focus:ring-purple-400 focus:border-transparent"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleUpdateFolder(folder.id);
+                            if (e.key === "Escape") {
+                              setEditingFolderId(null);
+                              setEditFolderName("");
+                              setEditFolderColor("#3B82F6");
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={editFolderColor}
+                            onChange={(e) => setEditFolderColor(e.target.value)}
+                            className="w-12 h-8 rounded cursor-pointer border border-gray-500"
+                          />
+                          <button
+                            onClick={() => handleUpdateFolder(folder.id)}
+                            className="flex-1 px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingFolderId(null);
+                              setEditFolderName("");
+                              setEditFolderColor("#3B82F6");
+                            }}
+                            className="px-3 py-1.5 bg-gray-600 text-gray-300 rounded-lg hover:bg-gray-500 transition-colors text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div
+                      key={folder.id}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                        isSelected
+                          ? "bg-purple-500/20 text-purple-300"
+                          : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
+                      }`}
+                    >
+                      <div
+                        className="w-1 h-8 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: folder.color }}
+                      />
+                      <button
+                        onClick={() => onFolderChange(isSelected ? null : folder.name)}
+                        className="flex-1 text-left flex items-center justify-between"
+                      >
+                        <span className="text-sm truncate">{folder.name}</span>
+                        <span className="text-xs px-2 py-0.5 bg-gray-600 rounded-full ml-2">
+                          {entryCount}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => startEditFolder(folder)}
+                        className="p-1 hover:bg-gray-600 rounded transition-colors"
+                        title="Edit folder"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFolder(folder.id)}
+                        className="p-1 hover:bg-red-500/20 text-red-400 rounded transition-colors"
+                        title="Delete folder"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </CollapsibleSection>
 

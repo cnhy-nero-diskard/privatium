@@ -7,11 +7,10 @@ import { getJournals, updateJournal, deleteJournal } from "@/utils/supabaseClien
 import { getJournalTags } from "@/utils/tagUtils";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { MoodIcon } from "../components/MoodIcon";
-import ExportButton from "@/components/ExportButton";
-import ImportButton from "@/components/ImportButton";
 import AITherapistSummary from "../components/AITherapistSummary";
 import { groupEntriesByMonth, formatMonthKey, getEntriesForMonth, getCurrentMonthKey } from "@/utils/dateUtils";
 import FilterSidebar from "../components/FilterSidebar";
+import { getFolders, type Folder } from "@/utils/folderUtils";
 
 import { Tag } from '@/types/tags';
 
@@ -48,6 +47,7 @@ const HomePage: React.FC = () => {
     const [showAISection, setShowAISection] = useState(false);
     const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthKey());
     const [monthlyEntries, setMonthlyEntries] = useState<JournalEntry[]>([]);
+	const [folders, setFolders] = useState<Folder[]>([]);
 	
 	// Filter states
 	const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -114,7 +114,24 @@ const HomePage: React.FC = () => {
 
 	useEffect(() => {
 		fetchEntries();
+		loadFolders();
 	}, []);
+
+	// Load folders
+	const loadFolders = async () => {
+		try {
+			const loadedFolders = await getFolders();
+			setFolders(loadedFolders);
+		} catch (error) {
+			console.error("Failed to load folders:", error);
+		}
+	};
+
+	// Get folder color by name
+	const getFolderColor = (folderName: string): string => {
+		const folder = folders.find(f => f.name === folderName);
+		return folder?.color || '#6B7280'; // Default gray color
+	};
 
 	// Update monthly entries when selected month or entries change
 	useEffect(() => {
@@ -270,6 +287,7 @@ const HomePage: React.FC = () => {
 					onTagToggle={handleTagToggle}
 					onMoodToggle={handleMoodToggle}
 					onClearFilters={handleClearFilters}
+					onImportComplete={fetchEntries}
 				/>
 				<div className="flex-1 px-4 lg:px-8 overflow-x-hidden">
 				<div className="w-full max-w-4xl mx-auto">
@@ -340,8 +358,6 @@ const HomePage: React.FC = () => {
 									onChange={(e) => setSearchTerm(e.target.value)}
 									className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 w-64"
 								/>
-								<ExportButton />
-								<ImportButton onImportComplete={fetchEntries} />
 								<button
 									className={`px-4 py-2 rounded-lg font-semibold shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 flex items-center gap-2 ${multiSelectMode ? 'text-red-600' : 'text-blue-600'} hover:bg-gradient-to-r hover:from-red-700 hover:via-pink-700 hover:to-purple-800 hover:text-white`}
 									onClick={() => {
@@ -480,19 +496,25 @@ const HomePage: React.FC = () => {
 													return (
 														<div
 															key={entry.id}
-															className={entryClasses}
+															className={`${entryClasses} flex`}
 															{...(!multiSelectMode ? { onClick: () => setSelectedEntry(entry) } : {})}
 														>
+															{/* Folder color bar */}
+															<div
+																className="w-1 rounded-l-lg flex-shrink-0"
+																style={{ backgroundColor: getFolderColor(entry.folder) }}
+															/>
+															<div className="flex-1 flex items-center">
 															{multiSelectMode && (
 																<input
 																	type="checkbox"
 																	checked={selectedIds.includes(entry.id)}
 																	onChange={() => toggleSelectEntry(entry.id)}
-																	className="form-checkbox h-5 w-5 text-blue-600"
+																	className="form-checkbox h-5 w-5 text-blue-600 ml-3"
 																	aria-label={`Select entry ${entry.title}`}
 																/>
 															)}
-															<div className="flex items-start justify-between w-full">
+															<div className={`flex items-start justify-between w-full ${multiSelectMode ? 'ml-3' : 'ml-3'}`}>
 																<div className="flex-1 pr-3">
 																	<div className="flex items-center gap-2 mb-1">
 																		<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-300" viewBox="0 0 20 20" fill="currentColor">
@@ -523,6 +545,7 @@ const HomePage: React.FC = () => {
 																<div className="ml-4 bg-amber-700/40 backdrop-blur-sm p-2 rounded-full shadow-md border border-amber-500/40 flex items-center justify-center text-xl rotate-3 transform hover:rotate-0 transition-transform">
 																	<MoodIcon mood={entry.mood} size="md" />
 																</div>
+															</div>
 															</div>
 														</div>
 													);
@@ -610,19 +633,25 @@ const HomePage: React.FC = () => {
 										return (
 										<div
 											key={entry.id}
-											className={entryClasses}
+											className={`${entryClasses} flex`}
 											{...(!multiSelectMode ? { onClick: () => setSelectedEntry(entry) } : {})}
 										>
+											{/* Folder color bar */}
+											<div
+												className="w-1 rounded-l-lg flex-shrink-0"
+												style={{ backgroundColor: getFolderColor(entry.folder) }}
+											/>
+											<div className="flex-1 flex items-center">
 											{multiSelectMode && (
 												<input
 													type="checkbox"
 													checked={selectedIds.includes(entry.id)}
 													onChange={() => toggleSelectEntry(entry.id)}
-													className="form-checkbox h-5 w-5 text-blue-600"
+													className="form-checkbox h-5 w-5 text-blue-600 ml-3"
 													aria-label={`Select entry ${entry.title}`}
 												/>
 											)}
-											<div className="flex items-start justify-between w-full">
+											<div className={`flex items-start justify-between w-full ${multiSelectMode ? 'ml-3' : 'ml-3'}`}>
 												<div className={`flex-1 ${isQuickNote ? 'pr-3' : ''}`}>
 													{isQuickNote ? (
 														<>
@@ -689,6 +718,7 @@ const HomePage: React.FC = () => {
 														<MoodIcon mood={entry.mood} size="lg" />
 													</div>
 												)}
+											</div>
 											</div>
 										</div>
 									);
