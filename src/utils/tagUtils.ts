@@ -28,14 +28,12 @@ export async function getJournalTags(journalId: number): Promise<Tag[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('journal_tags')
-    .select(`
-      tag_id,
-      tags:tags(*)
-    `)
+    .select('tags(*)')
     .eq('journal_id', journalId);
 
   if (error) throw error;
-  return data?.map(row => row.tags) || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data?.map((row: any) => row.tags).filter((tag: any) => tag !== null) || []) as Tag[];
 }
 
 export async function addTagToJournal(journalId: number, tagId: number): Promise<void> {

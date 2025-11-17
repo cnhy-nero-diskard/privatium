@@ -5,9 +5,9 @@ export interface EncryptedData {
 }
 
 // Convert string to Uint8Array
-function str2buf(str: string): ArrayBuffer {
+function str2buf(str: string): Uint8Array {
   const encoder = new TextEncoder();
-  return encoder.encode(str).buffer;
+  return encoder.encode(str);
 }
 
 // Convert ArrayBuffer to string
@@ -26,17 +26,17 @@ function buf2base64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-// Convert base64 string to ArrayBuffer
-function base64ToBuf(base64: string): ArrayBuffer {
+// Convert base64 string to Uint8Array
+function base64ToBuf(base64: string): Uint8Array {
   const binary_string = atob(base64);
   const bytes = new Uint8Array(binary_string.length);
   for (let i = 0; i < binary_string.length; i++) {
     bytes[i] = binary_string.charCodeAt(i);
   }
-  return bytes.buffer;
+  return bytes;
 }
 
-async function getKey(password: string, salt: ArrayBuffer): Promise<CryptoKey> {
+async function getKey(password: string, salt: BufferSource): Promise<CryptoKey> {
   const passwordBuffer = str2buf(password);
   const importedKey = await crypto.subtle.importKey(
     'raw',
@@ -49,7 +49,7 @@ async function getKey(password: string, salt: ArrayBuffer): Promise<CryptoKey> {
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: salt as Uint8Array,
       iterations: 100000,
       hash: 'SHA-256'
     },
@@ -61,23 +61,23 @@ async function getKey(password: string, salt: ArrayBuffer): Promise<CryptoKey> {
 }
 
 export async function encrypt(text: string, password: string): Promise<EncryptedData> {
-  const salt = crypto.getRandomValues(new Uint8Array(16)).buffer;
-  const iv = crypto.getRandomValues(new Uint8Array(12)).buffer;
-  const key = await getKey(password, salt);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await getKey(password, salt as BufferSource);
   
   const encrypted = await crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
-      iv
+      iv: iv as BufferSource
     },
     key,
-    str2buf(text)
+    str2buf(text) as BufferSource
   );
 
   return {
     encrypted: buf2base64(encrypted),
-    iv: buf2base64(iv),
-    salt: buf2base64(salt)
+    iv: buf2base64(iv.buffer),
+    salt: buf2base64(salt.buffer)
   };
 }
 
@@ -86,24 +86,27 @@ export async function decrypt(encryptedData: EncryptedData, password: string): P
   const salt = base64ToBuf(encryptedData.salt);
   const encrypted = base64ToBuf(encryptedData.encrypted);
   
-  const key = await getKey(password, salt);
+  const key = await getKey(password, salt as BufferSource);
   
   const decrypted = await crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
-      iv
+      iv: iv as BufferSource
     },
     key,
-    encrypted
+    encrypted as BufferSource
   );
 
   return buf2str(decrypted);
 }
 
-export function isEncryptedData(obj: any): obj is EncryptedData {
-  return obj 
+export function isEncryptedData(obj: unknown): obj is EncryptedData {
+  return obj !== null
     && typeof obj === 'object'
-    && typeof obj.encrypted === 'string'
-    && typeof obj.iv === 'string'
-    && typeof obj.salt === 'string';
+    && 'encrypted' in obj
+    && 'iv' in obj
+    && 'salt' in obj
+    && typeof (obj as EncryptedData).encrypted === 'string'
+    && typeof (obj as EncryptedData).iv === 'string'
+    && typeof (obj as EncryptedData).salt === 'string';
 }

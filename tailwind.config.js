@@ -18,8 +18,8 @@ module.exports = {
         'accent-foreground': 'var(--accent-foreground)',
       },
       fontFamily: {
-        sans: ['var(--font-geist-sans)'],
-        mono: ['var(--font-geist-mono)'],
+        sans: ['var(--font-inter)', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['var(--font-lora)', 'Georgia', 'serif'],
       },
     },
   },

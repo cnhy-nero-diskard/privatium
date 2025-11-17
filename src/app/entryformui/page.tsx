@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, Suspense } from "react";
 import { Save, Check, Loader2, MapPin, Globe, Sun, HelpCircle, X, Smile, SmilePlus, Meh, Frown, Angry, Calendar, Clock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createJournal, updateJournal } from "@/utils/supabaseClient";
@@ -502,4 +502,10 @@ const EntryForm: React.FC = () => {
   );
 };
 
-export default EntryForm;
+export default function EntryFormPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EntryForm />
+    </Suspense>
+  );
+}
