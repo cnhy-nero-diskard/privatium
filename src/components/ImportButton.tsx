@@ -1,5 +1,6 @@
 import { FC, useState, useRef } from 'react';
 import { parseCSV, importEntries, checkDuplicates } from '@/utils/importUtils';
+import ImportResultModal from './ImportResultModal';
 
 interface DuplicateEntry {
   date: string;
@@ -21,6 +22,18 @@ const ImportButton: FC<ImportButtonProps> = ({ onImportComplete }) => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicates, setDuplicates] = useState<DuplicateEntry[]>([]);
   const [pendingEntries, setPendingEntries] = useState<any[]>([]);
+  const [resultModal, setResultModal] = useState<{
+    isOpen: boolean;
+    result: {
+      success: boolean;
+      message: string;
+      errors?: string[];
+    } | null;
+  }>({
+    isOpen: false,
+    result: null
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,7 +42,13 @@ const ImportButton: FC<ImportButtonProps> = ({ onImportComplete }) => {
 
     // Validate file type
     if (!file.name.endsWith('.csv')) {
-      alert('Please select a CSV file');
+      setResultModal({
+        isOpen: true,
+        result: {
+          success: false,
+          message: 'Please select a CSV file'
+        }
+      });
       return;
     }
 
@@ -38,12 +57,18 @@ const ImportButton: FC<ImportButtonProps> = ({ onImportComplete }) => {
     try {
       // Read file content
       const content = await file.text();
-      
+
       // Parse CSV
       const entries = parseCSV(content);
-      
+
       if (entries.length === 0) {
-        alert('No valid entries found in the CSV file');
+        setResultModal({
+          isOpen: true,
+          result: {
+            success: false,
+            message: 'No valid entries found in the CSV file'
+          }
+        });
         setImporting(false);
         return;
       }
@@ -62,7 +87,13 @@ const ImportButton: FC<ImportButtonProps> = ({ onImportComplete }) => {
       }
     } catch (error) {
       console.error('Import error:', error);
-      alert(`Failed to import: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setResultModal({
+        isOpen: true,
+        result: {
+          success: false,
+          message: `Failed to import: ${error instanceof Error ? error.message : 'Unknown error'}`
+        }
+      });
     } finally {
       setImporting(false);
       // Reset file input
@@ -76,20 +107,42 @@ const ImportButton: FC<ImportButtonProps> = ({ onImportComplete }) => {
     setImporting(true);
     try {
       const result = await importEntries(entries, overwrite);
-      
+
       if (result.success) {
         let message = `Successfully imported ${result.imported} entries`;
         if (result.errors.length > 0) {
-          message += `\n\nSome entries failed to import:\n${result.errors.join('\n')}`;
+          message += `\n\nSome entries failed to import.`;
         }
-        alert(message);
+
+        setResultModal({
+          isOpen: true,
+          result: {
+            success: true,
+            message: message,
+            errors: result.errors.length > 0 ? result.errors : undefined
+          }
+        });
+
         onImportComplete();
       } else {
-        alert(`Import failed: ${result.errors.join('\n')}`);
+        setResultModal({
+          isOpen: true,
+          result: {
+            success: false,
+            message: 'Import failed',
+            errors: result.errors
+          }
+        });
       }
     } catch (error) {
       console.error('Import error:', error);
-      alert(`Failed to import: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setResultModal({
+        isOpen: true,
+        result: {
+          success: false,
+          message: `Failed to import: ${error instanceof Error ? error.message : 'Unknown error'}`
+        }
+      });
     } finally {
       setImporting(false);
       setShowDuplicateModal(false);
@@ -114,6 +167,10 @@ const ImportButton: FC<ImportButtonProps> = ({ onImportComplete }) => {
     setPendingEntries([]);
   };
 
+  const closeResultModal = () => {
+    setResultModal(prev => ({ ...prev, isOpen: false }));
+  };
+
   return (
     <>
       <input
@@ -123,7 +180,7 @@ const ImportButton: FC<ImportButtonProps> = ({ onImportComplete }) => {
         onChange={handleFileSelect}
         style={{ display: 'none' }}
       />
-      
+
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={importing}
@@ -147,6 +204,13 @@ const ImportButton: FC<ImportButtonProps> = ({ onImportComplete }) => {
           </>
         )}
       </button>
+
+      {/* Result Modal */}
+      <ImportResultModal
+        isOpen={resultModal.isOpen}
+        onClose={closeResultModal}
+        result={resultModal.result}
+      />
 
       {/* Duplicate Modal */}
       {showDuplicateModal && (
