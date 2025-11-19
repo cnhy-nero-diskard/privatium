@@ -293,7 +293,7 @@ const HomePage: React.FC = () => {
 				<div className="w-full max-w-4xl mx-auto">
 				<div className="text-center mb-12 animate-fadeIn">
 					<h1 className="text-4xl font-bold mb-4 text-gray-800 dark:text-gray-100 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-						Yo
+						'sup
 					</h1>
 					<p className="text-gray-600 dark:text-gray-300 text-lg max-w-2xl mx-auto">
 						Built with privacy
@@ -463,8 +463,10 @@ const HomePage: React.FC = () => {
 							{(() => {
 								const isSameDay = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
 
+								// Only show quick notes created today
 								const quickNotes = filteredEntries.filter(entry => 
-									(!entry.content || entry.content.trim() === '')
+									(!entry.content || entry.content.trim() === '') &&
+									isSameDay(entry.date)
 								);
 								
 								if (quickNotes.length > 0) {
