@@ -289,8 +289,8 @@ const HomePage: React.FC = () => {
 					onClearFilters={handleClearFilters}
 					onImportComplete={fetchEntries}
 				/>
-				<div className="flex-1 px-4 lg:px-8 overflow-x-hidden">
-				<div className="w-full max-w-4xl mx-auto">
+				<div className="flex-1 px-0 lg:px-8 overflow-x-hidden">
+							<div className="w-full max-w-4xl mx-auto px-0 lg:px-4">
 				<div className="text-center mb-12 animate-fadeIn">
 					<h1 className="text-4xl font-bold mb-4 text-gray-800 dark:text-gray-100 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
 						'sup
@@ -617,110 +617,91 @@ const HomePage: React.FC = () => {
 										const hoursSinceCreation = (now.getTime() - entryDate.getTime()) / (1000 * 60 * 60);
 										const isRecent = hoursSinceCreation <= 24;
 										
-										// Determine CSS classes for highlighting
-										let entryClasses = `backdrop-blur-sm rounded-lg transition-all duration-300 border hover:border-gray-600 
-										    ${multiSelectMode ? 'flex items-center gap-3' : 'cursor-pointer'}`;
-										
-										// Apply different styling based on entry type
+										// Determine CSS classes for highlight/multi-select
+										let entryClasses = `backdrop-blur-sm rounded-lg transition-all duration-300 border w-full max-w-full overflow-hidden
+										    ${multiSelectMode ? ' cursor-default' : ' cursor-pointer'}`;
+
 										if (isQuickNote) {
-											// Quick note styling - completely different visual style
-											entryClasses += isRecent 
-											    ? ' bg-gradient-to-br from-amber-500/80 to-orange-600/70 border-amber-400 border-dashed p-3 shadow-lg shadow-amber-700/20 transform hover:-translate-y-1'  // Recent quick note
-											    : ' bg-gradient-to-br from-amber-600/40 to-orange-700/30 border-amber-500/30 border-dashed p-3 shadow hover:shadow-amber-700/10 transform hover:-translate-y-1'; // Older quick note
+											entryClasses += isRecent
+												? ' bg-gradient-to-br from-amber-500/80 to-orange-600/70 border-amber-400 border-dashed shadow-lg shadow-amber-700/20 hover:-translate-y-1'
+												: ' bg-gradient-to-br from-amber-600/40 to-orange-700/30 border-amber-500/30 border-dashed shadow hover:shadow-amber-700/10 hover:-translate-y-1';
 										} else {
-											// Regular entry styling
-											entryClasses += ' bg-gray-800/50 border-gray-700/50 p-4 hover:bg-gray-800/70';
+											// Base dark tile for regular journal entries
+											entryClasses += ' bg-black border-gray-700 hover:border-gray-500';
 										}
-										
+
+										// Format date/time pieces for the left column
+										const entryDateObj = new Date(entry.date);
+									const dayName = entryDateObj.toLocaleDateString(undefined, { weekday: 'short' });
+									const dayNumber = entryDateObj.toLocaleDateString(undefined, { day: '2-digit' });
+										const timeString = entryDateObj.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
 										return (
 										<div
 											key={entry.id}
-											className={`${entryClasses} flex`}
+											className={entryClasses}
 											{...(!multiSelectMode ? { onClick: () => setSelectedEntry(entry) } : {})}
 										>
-											{/* Folder color bar */}
-											<div
-												className="w-1 rounded-l-lg flex-shrink-0"
-												style={{ backgroundColor: getFolderColor(entry.folder) }}
-											/>
-											<div className="flex-1 flex items-center">
-											{multiSelectMode && (
-												<input
-													type="checkbox"
-													checked={selectedIds.includes(entry.id)}
-													onChange={() => toggleSelectEntry(entry.id)}
-													className="form-checkbox h-5 w-5 text-blue-600 ml-3"
-													aria-label={`Select entry ${entry.title}`}
+											<div className="flex h-full w-full">
+												{/* Folder color bar on extreme left */}
+												<div
+													className="w-2 flex-shrink-0"
+													style={{ backgroundColor: getFolderColor(entry.folder) }}
 												/>
-											)}
-											<div className={`flex items-start justify-between w-full ${multiSelectMode ? 'ml-3' : 'ml-3'}`}>
-												<div className={`flex-1 ${isQuickNote ? 'pr-3' : ''}`}>
-													{isQuickNote ? (
-														<>
-															{/* Quick Note Style - More like a sticky note */}
-															<div className="flex items-center gap-2 mb-1">
-																{/* Sticky Note Icon */}
-																<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-300" viewBox="0 0 20 20" fill="currentColor">
-																	<path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm3 1h6v4H7V5z" clipRule="evenodd" />
-																</svg>
-																<h3 className="font-medium text-gray-100 text-base tracking-wide">
-																	{entry.title}
-																	{isRecent && (
-																		<span className="ml-2 text-xs px-2 py-0.5 bg-amber-500 rounded-full text-white font-bold">New</span>
-																	)}
-																</h3>
-															</div>
-															<div className="flex items-center gap-3 text-sm text-amber-100/80">
-																<span className="flex items-center gap-1">
-																	<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-																	</svg>
-																	{entry.date}
-																</span>
-																<span className="flex items-center gap-1">
-																	<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-																	</svg>
-																	{entry.folder}
-																</span>
-															</div>
-														</>
-													) : (
-														<>
-															{/* Regular Entry Style */}
-															<h3 className="font-medium text-gray-100 text-lg mb-1">
-																{entry.title}
-															</h3>
-															<div className="text-xs italic text-gray-400 mb-2 line-clamp-1">
-																{entry.content ? (entry.content.length > 100 ? `${entry.content.substring(0, 100)}...` : entry.content) : ''}
-															</div>
-															<div className="flex items-center gap-3 text-sm text-gray-400">
-																<span className="flex items-center gap-1">
-																	<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-																	</svg>
-																	{entry.date}
-																</span>
-																<span className="flex items-center gap-1">
-																	<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-																		<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-																	</svg>
-																	{entry.folder}
-																</span>
-															</div>
-														</>
-													)}
+
+												{/* Left date/time column */}
+												<div className="flex flex-col justify-between items-center px-3 py-3 bg-gray-900 text-white min-w-[80px] md:min-w-[110px]">
+													<span className="text-sm md:text-base font-semibold tracking-wide text-center leading-tight">{dayName}</span>
+													<span className="text-2xl md:text-3xl font-bold mt-2 mb-2 leading-none">{dayNumber}</span>
+													<span className="text-xs md:text-sm font-medium tracking-wide leading-tight">{timeString}</span>
 												</div>
-												{isQuickNote ? (
-													<div className="ml-4 bg-amber-700/40 backdrop-blur-sm p-2 rounded-full shadow-md border border-amber-500/40 flex items-center justify-center text-xl rotate-3 transform hover:rotate-0 transition-transform">
-														<MoodIcon mood={entry.mood} size="md" />
+
+												{/* Right content column */}
+												<div className="flex-1 flex items-stretch min-w-0">
+													{multiSelectMode && (
+														<div className="flex items-start pl-3 pt-3">
+															<input
+																type="checkbox"
+																checked={selectedIds.includes(entry.id)}
+																onChange={() => toggleSelectEntry(entry.id)}
+																className="form-checkbox h-5 w-5 text-blue-500"
+																aria-label={`Select entry ${entry.title}`}
+															/>
+														</div>
+													)}
+													<div className={`flex w-full items-stretch min-w-0 ${multiSelectMode ? 'pl-3 pr-3 py-3' : 'px-4 md:px-6 py-3 md:py-4'}`}>
+														<div className="flex-1 flex flex-col justify-center">
+															{isQuickNote ? (
+																<>
+																	<h3 className="font-semibold text-amber-100 text-base tracking-wide mb-2 flex items-center gap-2">
+																		<span>{entry.title}</span>
+																		{isRecent && (
+																			<span className="text-xs px-2 py-0.5 bg-amber-500 rounded-full text-white font-bold">New</span>
+																		)}
+																	</h3>
+																	<div className="text-xs text-amber-100/80 flex gap-4">
+																		<span>{entry.date}</span>
+																		<span>{entry.folder}</span>
+																	</div>
+																</>
+															) : (
+																<>
+																	<h3 className="text-lg md:text-2xl font-bold text-white mb-2 md:mb-3 tracking-wide break-words">
+																		{entry.title}
+																	</h3>
+																	<div className="text-xs md:text-sm text-gray-200 leading-relaxed line-clamp-3 break-words">
+																		{entry.content ? (entry.content.length > 200 ? `${entry.content.substring(0, 200)}...` : entry.content) : ''}
+																	</div>
+																</>
+															)}
+														</div>
+														<div className="ml-4 flex items-center pr-4">
+															<div className={isQuickNote ? 'bg-amber-700/40 backdrop-blur-sm p-2 rounded-full shadow-md border border-amber-500/40 flex items-center justify-center text-xl rotate-3 transform hover:rotate-0 transition-transform' : 'bg-gray-900/80 backdrop-blur-sm p-3 rounded-full shadow-lg border border-gray-700/80 flex items-center justify-center text-2xl'}>
+																<MoodIcon mood={entry.mood} size={isQuickNote ? 'md' : 'lg'} />
+															</div>
+														</div>
 													</div>
-												) : (
-													<div className="ml-4 bg-gray-900/50 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-700/50 flex items-center justify-center text-2xl">
-														<MoodIcon mood={entry.mood} size="lg" />
-													</div>
-												)}
-											</div>
+												</div>
 											</div>
 										</div>
 									);
