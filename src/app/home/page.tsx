@@ -545,7 +545,9 @@ const HomePage: React.FC = () => {
 																	</div>
 																</div>
 																<div className="ml-4 bg-amber-700/40 backdrop-blur-sm p-2 rounded-full shadow-md border border-amber-500/40 flex items-center justify-center text-xl rotate-3 transform hover:rotate-0 transition-transform">
-																	<MoodIcon mood={entry.mood} size="md" />
+																	{entry.mood && entry.mood.trim() !== "" && (
+																		<MoodIcon mood={entry.mood} size="md" />
+																	)}
 																</div>
 															</div>
 															</div>
@@ -695,11 +697,13 @@ const HomePage: React.FC = () => {
 																</>
 															)}
 														</div>
-														<div className="ml-4 flex items-center pr-4">
-															<div className={isQuickNote ? 'bg-amber-700/40 backdrop-blur-sm p-2 rounded-full shadow-md border border-amber-500/40 flex items-center justify-center text-xl rotate-3 transform hover:rotate-0 transition-transform' : 'bg-gray-900/80 backdrop-blur-sm p-3 rounded-full shadow-lg border border-gray-700/80 flex items-center justify-center text-2xl'}>
-																<MoodIcon mood={entry.mood} size={isQuickNote ? 'md' : 'lg'} />
+														{entry.mood && entry.mood.trim() !== "" && (
+															<div className="ml-4 flex items-center pr-4">
+																<div className={isQuickNote ? 'bg-amber-700/40 backdrop-blur-sm p-2 rounded-full shadow-md border border-amber-500/40 flex items-center justify-center text-xl rotate-3 transform hover:rotate-0 transition-transform' : 'bg-gray-900/80 backdrop-blur-sm p-3 rounded-full shadow-lg border border-gray-700/80 flex items-center justify-center text-2xl'}>
+																	<MoodIcon mood={entry.mood} size={isQuickNote ? 'md' : 'lg'} />
+																</div>
 															</div>
-														</div>
+														)}
 													</div>
 												</div>
 											</div>
