@@ -60,6 +60,7 @@ const EntryForm: React.FC = () => {
   
   const today = new Date();
   const [date, setDate] = useState<string>(formatDate(today));
+  const originalEntryRef = useRef<any | null>(null);
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [title, setTitle] = useState<string>('');
   const [content, setContent] = useState<string>(initialValue);
@@ -106,6 +107,8 @@ const EntryForm: React.FC = () => {
           setFolder(entryState.folder || '');
           if (entryState.mood) setMood(entryState.mood);
           if (entryState.tags) setSelectedTags(entryState.tags);
+          // keep a copy of the original entry to compare changes when editing
+          originalEntryRef.current = entryState;
           // Clear the state after loading
           clearEntryState();
         }
@@ -167,6 +170,27 @@ const EntryForm: React.FC = () => {
   // Check if the content has text
   const hasContent = () => {
     return content && content.trim().length > 0;
+  };
+
+  // Determine whether the form can be saved.
+  // - New entries: allow save if title or content exists.
+  // - Editing existing entry: allow save if any field changed (title-only edits allowed).
+  const canSave = () => {
+    if (!isEdit) return Boolean(title.trim() || hasContent());
+
+    const orig = originalEntryRef.current;
+    if (!orig) return Boolean(title.trim() || hasContent());
+
+    const titleChanged = (title || '') !== (orig.title || '');
+    const contentChanged = (content || '') !== (orig.content || '');
+    const folderChanged = (folder || '') !== (orig.folder || '');
+    const moodChanged = (mood || '') !== (orig.mood || '');
+    const dateChanged = (date || '') !== (orig.date || '');
+    const origTagIds = (orig.tags || []).map((t: any) => t.id).sort();
+    const currTagIds = (selectedTags || []).map((t: any) => t.id).sort();
+    const tagsChanged = JSON.stringify(origTagIds) !== JSON.stringify(currTagIds);
+
+    return titleChanged || contentChanged || folderChanged || moodChanged || dateChanged || tagsChanged;
   };
 
   // Progress calculation
@@ -484,7 +508,7 @@ const EntryForm: React.FC = () => {
             <button
               type="submit"
               className={`bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 text-white px-6 py-2 rounded-lg font-medium shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${saving ? 'pointer-events-none' : ''}`}
-              disabled={!title.trim() || !hasContent() || saving}
+              disabled={!canSave() || saving}
             >
               {saving ? (
                 <Loader2 className="animate-spin mr-1 w-4 h-4" />
