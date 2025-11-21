@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import JournalModal from "../components/JournalModal";
 import Link from "next/link";
 import TopNavigation from "../components/TopNavigation";
@@ -55,24 +55,55 @@ const HomePage: React.FC = () => {
 	const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
 	const [quickNotesMode, setQuickNotesMode] = useState<'all' | 'only-quick-notes' | 'mixed'>('all');
 
-	const fetchEntries = async () => {
+	// Lazy loading states
+	const [isLazyLoading, setIsLazyLoading] = useState(false);
+	const [hasMore, setHasMore] = useState(true);
+	const [page, setPage] = useState(0);
+	const [totalCount, setTotalCount] = useState(0);
+	const [isSearchMode, setIsSearchMode] = useState(false);
+	const ITEMS_PER_PAGE = 50; // Load 50 entries at a time
+	const observerTarget = React.useRef<HTMLDivElement>(null);
+
+	// Fetch entries with lazy loading support
+	const fetchEntries = useCallback(async (resetData: boolean = false) => {
 		setError(null);
-		setLoading(true);
+		
+		// If resetting, start from page 0
+		const currentPage = resetData ? 0 : page;
+		
+		if (resetData) {
+			setLoading(true);
+			setEntries([]);
+			setPage(0);
+			setHasMore(true);
+		} else {
+			setIsLazyLoading(true);
+		}
+
 		try {
-			const response = await getJournals(currentEtag || undefined);
+			const response = await getJournals({
+				currentEtag: currentEtag || undefined,
+				limit: ITEMS_PER_PAGE,
+				offset: currentPage * ITEMS_PER_PAGE
+			});
 			
 			// If status is 304, data hasn't changed, so we can keep using the current entries
 			if (response.status === 304) {
 				setLoading(false);
+				setIsLazyLoading(false);
 				return;
 			}
 			
-			const { data, etag } = response as ApiResponse;
+			const { data, etag, totalCount: count, hasMore: more } = response as ApiResponse & { totalCount: number; hasMore: boolean };
 			
 			// Update our etag
 			if (etag) {
 				setCurrentEtag(etag);
 			}
+			
+			// Update total count and hasMore flag
+			setTotalCount(count);
+			setHasMore(more);
 			
 			// Check for decryption errors
 			const hasDecryptionErrors = data.some(entry => entry._decryptError);
@@ -88,7 +119,13 @@ const HomePage: React.FC = () => {
 				})
 			);
 			
-			setEntries(entriesWithTags || []);
+			// Append new entries or replace all entries
+			if (resetData) {
+				setEntries(entriesWithTags || []);
+			} else {
+				setEntries(prev => [...prev, ...(entriesWithTags || [])]);
+				setPage(currentPage + 1);
+			}
 		} catch (error) {
 			console.error('Error fetching entries:', error);
 			let errorMessage: string;
@@ -107,16 +144,102 @@ const HomePage: React.FC = () => {
 			}
 			
 			setError(errorMessage);
+			if (resetData) {
+				setEntries([]);
+			}
+		} finally {
+			setLoading(false);
+			setIsLazyLoading(false);
+		}
+	}, [page, currentEtag]);
+
+	// Specialized search function that queries all entries
+	const performSearch = async () => {
+		setError(null);
+		setLoading(true);
+		setIsSearchMode(true);
+		
+		try {
+			// Import searchJournals from supabaseClient
+			const { searchJournals } = await import('@/utils/supabaseClient');
+			
+			const response = await searchJournals(searchTerm, {
+				folder: selectedFolder,
+				tags: selectedTags,
+				moods: selectedMoods,
+				date: selectedDate
+			});
+			
+			const { data } = response;
+			
+			// Load tags for each entry
+			const entriesWithTags = await Promise.all(
+				data.map(async entry => {
+					if (!entry.id) return entry;
+					const tags = await getJournalTags(entry.id);
+					return { ...entry, content: entry.content ?? "", tags };
+				})
+			);
+			
+			// Apply tag filter if needed (since backend doesn't do this)
+			let filtered = entriesWithTags;
+			if (selectedTags.length > 0) {
+				filtered = filtered.filter(entry => {
+					const entryTagNames = entry.tags?.map(t => t.name) || [];
+					return selectedTags.some(tag => entryTagNames.includes(tag));
+				});
+			}
+			
+			setEntries(filtered as JournalEntry[]);
+			setHasMore(false); // No pagination in search mode
+		} catch (error) {
+			console.error('Error searching entries:', error);
+			setError('An error occurred while searching. Please try again.');
 			setEntries([]);
 		} finally {
 			setLoading(false);
 		}
 	};
 
+	// Initial load
 	useEffect(() => {
-		fetchEntries();
+		fetchEntries(true);
 		loadFolders();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+
+	// Intersection observer for lazy loading
+	useEffect(() => {
+		if (isSearchMode || !hasMore || loading) {
+			return; // Don't set up observer in search mode or when nothing more to load
+		}
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				// Load more when the target is visible
+				if (entries[0].isIntersecting && !isLazyLoading) {
+					console.log('Intersection detected - loading more entries');
+					fetchEntries(false);
+				}
+			},
+			{ 
+				threshold: 0.1,
+				rootMargin: '100px' // Start loading 100px before reaching the target
+			}
+		);
+
+		const currentTarget = observerTarget.current;
+		if (currentTarget) {
+			observer.observe(currentTarget);
+			console.log('Observer attached to target');
+		}
+
+		return () => {
+			if (currentTarget) {
+				observer.unobserve(currentTarget);
+			}
+		};
+	}, [hasMore, isLazyLoading, loading, isSearchMode, fetchEntries]);
 
 	// Load folders
 	const loadFolders = async () => {
@@ -148,7 +271,12 @@ const HomePage: React.FC = () => {
 	const handleEdit = async (updatedEntry: any) => {
 		try {
 			await updateJournal(updatedEntry.id, updatedEntry);
-			await fetchEntries();
+			// Reload data based on current mode
+			if (isSearchMode) {
+				await performSearch();
+			} else {
+				await fetchEntries(true);
+			}
 			setSelectedEntry(null);
 		} catch (error) {
 			console.error('Error updating entry:', error);
@@ -173,7 +301,12 @@ const HomePage: React.FC = () => {
 		if (deleteType === 'single' && selectedEntry) {
 			try {
 				await deleteJournal(Number(selectedEntry.id));
-				await fetchEntries();
+				// Reload data based on current mode
+				if (isSearchMode) {
+					await performSearch();
+				} else {
+					await fetchEntries(true);
+				}
 				setSelectedEntry(null);
 			} catch (error) {
 				console.error('Error deleting entry:', error);
@@ -184,7 +317,12 @@ const HomePage: React.FC = () => {
 				await Promise.all(selectedIds.map(id => deleteJournal(id)));
 				setSelectedIds([]);
 				setMultiSelectMode(false);
-				await fetchEntries();
+				// Reload data based on current mode
+				if (isSearchMode) {
+					await performSearch();
+				} else {
+					await fetchEntries(true);
+				}
 			} catch (error) {
 				console.error('Error deleting entries:', error);
 				alert('Failed to delete selected entries.');
@@ -209,6 +347,21 @@ const HomePage: React.FC = () => {
 
 	// Deselect all
 	const deselectAll = () => setSelectedIds([]);
+
+	// Effect to trigger search or reload when filters/search change
+	useEffect(() => {
+		// If there's a search term or any filters active, use search mode
+		const hasActiveFilters = searchTerm || selectedDate || selectedFolder || 
+			selectedTags.length > 0 || selectedMoods.length > 0;
+		
+		if (hasActiveFilters) {
+			performSearch();
+		} else {
+			// No filters - return to lazy loading mode
+			setIsSearchMode(false);
+			fetchEntries(true);
+		}
+	}, [searchTerm, selectedDate, selectedFolder, selectedTags, selectedMoods]);
 
 	// Filter handlers
 	const handleDateChange = (date: string | null) => {
@@ -301,7 +454,7 @@ const HomePage: React.FC = () => {
 				onMoodToggle={handleMoodToggle}
 				onQuickNotesModeChange={handleQuickNotesModeChange}
 				onClearFilters={handleClearFilters}
-				onImportComplete={fetchEntries}
+				onImportComplete={() => fetchEntries(true)}
 			/>
 				<div className="flex-1 px-0 lg:px-8 overflow-x-hidden">
 					<div className="w-full max-w-6xl mx-auto px-0 lg:px-4">
@@ -382,7 +535,7 @@ const HomePage: React.FC = () => {
 								{error}
 							</p>
 							<button
-								onClick={() => fetchEntries()}
+								onClick={() => fetchEntries(true)}
 								className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-lg flex items-center gap-2 mx-auto"
 							>
 								<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -726,6 +879,48 @@ const HomePage: React.FC = () => {
 								}
 								return null;
 							})()}
+
+							{/* Lazy loading indicator and observer target */}
+							{!isSearchMode && hasMore && (
+								<div className="py-8">
+									{/* Observer target - invisible trigger point */}
+									<div ref={observerTarget} className="h-2"></div>
+									
+									{/* Loading indicator */}
+									{isLazyLoading ? (
+										<div className="space-y-4 text-center">
+											<div className="animate-pulse flex justify-center">
+												<div className="h-8 w-8 bg-blue-500 rounded-full animate-bounce"></div>
+											</div>
+											<p className="text-gray-500 dark:text-gray-400">Loading more entries...</p>
+										</div>
+									) : (
+										/* Manual load more button as fallback */
+										<div className="text-center">
+											<button
+												onClick={() => fetchEntries(false)}
+												className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-lg transition-colors font-semibold"
+											>
+												Load More Entries
+											</button>
+										</div>
+									)}
+								</div>
+							)}
+
+							{/* Show total count info */}
+							{!loading && entries.length > 0 && (
+								<div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+									{isSearchMode ? (
+										<p>Found {entries.length} matching {entries.length === 1 ? 'entry' : 'entries'}</p>
+									) : (
+										<p>
+											Showing {entries.length} of {totalCount} {totalCount === 1 ? 'entry' : 'entries'}
+											{!hasMore && entries.length === totalCount && ' (all loaded)'}
+										</p>
+									)}
+								</div>
+							)}
 						</>
 					)}
 					

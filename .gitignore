@@ -40,3 +40,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 public/samplefromdiaro.csv
+LAZY_LOADING_IMPLEMENTATION.md

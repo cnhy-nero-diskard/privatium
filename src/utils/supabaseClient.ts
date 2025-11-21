@@ -106,7 +106,17 @@ async function decryptJournalData(journal: EncryptedJournalEntry): Promise<Journ
 let lastEtag: string | null = null;
 let lastData: JournalEntry[] | null = null;
 
-export async function getJournals(currentEtag?: string) {
+/**
+ * Get journals with pagination support for lazy loading
+ * @param options - Options for fetching journals
+ * @param options.currentEtag - Current etag for cache validation
+ * @param options.limit - Number of entries to fetch (for pagination)
+ * @param options.offset - Offset for pagination
+ * @returns Paginated journal entries with metadata
+ */
+export async function getJournals(options?: { currentEtag?: string; limit?: number; offset?: number }) {
+  const { currentEtag, limit, offset } = options || {};
+  
   try {
     const supabase = getSupabaseClient();
     
@@ -127,15 +137,30 @@ export async function getJournals(currentEtag?: string) {
     const newEtag = latestUpdate?.updated_at || 'initial';
     
     // If the current etag matches the new one, return 304 (no change)
-    if (currentEtag && currentEtag === newEtag && lastData) {
+    // Only use cache if no pagination parameters are provided
+    if (currentEtag && currentEtag === newEtag && lastData && !limit && !offset) {
       return { status: 304, data: lastData };
     }
     
+    // Get total count for pagination
+    const { count } = await supabase
+      .from('journals')
+      .select('*', { count: 'exact', head: true });
+    
     // If data has changed or we don't have cached data, fetch it
-    const { data, error } = await supabase
+    let query = supabase
       .from('journals')
       .select('*')
       .order('date', { ascending: false });
+    
+    // Apply pagination if limit is provided
+    if (limit !== undefined) {
+      const startRange = offset || 0;
+      const endRange = startRange + limit - 1;
+      query = query.range(startRange, endRange);
+    }
+    
+    const { data, error } = await query;
       
     if (error) {
       console.error('Supabase query error:', JSON.stringify(error, null, 2));
@@ -173,14 +198,18 @@ export async function getJournals(currentEtag?: string) {
         console.warn('Some journals could not be decrypted properly');
       }
       
-      // Update the cache
-      lastEtag = newEtag;
-      lastData = decryptedJournals;
+      // Update the cache only if fetching all data
+      if (!limit && !offset) {
+        lastEtag = newEtag;
+        lastData = decryptedJournals;
+      }
       
       return { 
         status: 200, 
         data: decryptedJournals,
-        etag: newEtag 
+        etag: newEtag,
+        totalCount: count || 0,
+        hasMore: limit ? (offset || 0) + limit < (count || 0) : false
       };
     } catch (decryptError) {
       console.error('Failed to decrypt journals:', JSON.stringify(decryptError, null, 2));
@@ -194,6 +223,94 @@ export async function getJournals(currentEtag?: string) {
     // For unexpected errors, provide a generic message
     console.error('Unexpected error in getJournals:', JSON.stringify(error, null, 2));
     throw new Error('An unexpected error occurred while fetching your journals. Please try again later.');
+  }
+}
+
+/**
+ * Search journals across all entries (bypasses pagination)
+ * This ensures search works across the entire dataset
+ * @param searchTerm - Text to search for in title and content
+ * @param filters - Optional filters (folder, tags, moods, date)
+ * @returns All matching journal entries
+ */
+export async function searchJournals(
+  searchTerm: string,
+  filters?: {
+    folder?: string | null;
+    tags?: string[];
+    moods?: string[];
+    date?: string | null;
+  }
+) {
+  try {
+    const supabase = getSupabaseClient();
+    
+    // Fetch all journals (no pagination for search)
+    const { data, error } = await supabase
+      .from('journals')
+      .select('*')
+      .order('date', { ascending: false });
+      
+    if (error) {
+      console.error('Supabase search error:', JSON.stringify(error, null, 2));
+      throw new Error(`Search failed: ${error.message || 'Unknown error occurred'}`);
+    }
+    
+    if (!data) {
+      return { status: 200, data: [] };
+    }
+    
+    // Decrypt all journals
+    const decryptedJournals = await Promise.all(
+      data.map(async (journal) => {
+        try {
+          return await decryptJournalData(journal as EncryptedJournalEntry);
+        } catch (decryptError) {
+          console.error(`Failed to decrypt journal ${journal.id}:`, decryptError);
+          return null;
+        }
+      })
+    );
+    
+    // Filter out failed decryptions and apply search/filters
+    const validJournals = decryptedJournals.filter((j): j is JournalEntry => j !== null);
+    
+    // Apply search term filter (case-insensitive)
+    let results = validJournals;
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      results = results.filter(entry => 
+        entry.title.toLowerCase().includes(lowerSearchTerm) ||
+        (entry.content && entry.content.toLowerCase().includes(lowerSearchTerm))
+      );
+    }
+    
+    // Apply additional filters if provided
+    if (filters?.folder) {
+      results = results.filter(entry => entry.folder === filters.folder);
+    }
+    
+    if (filters?.date) {
+      results = results.filter(entry => entry.date === filters.date);
+    }
+    
+    if (filters?.moods && filters.moods.length > 0) {
+      results = results.filter(entry => filters.moods!.includes(entry.mood));
+    }
+    
+    // Note: Tag filtering would need to be done after loading tags for each entry
+    // This is handled in the component layer
+    
+    return {
+      status: 200,
+      data: results
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    console.error('Unexpected error in searchJournals:', JSON.stringify(error, null, 2));
+    throw new Error('An unexpected error occurred while searching. Please try again.');
   }
 }
 
