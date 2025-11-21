@@ -53,6 +53,12 @@ export function Navigation() {
           >
             Themes
           </Link>
+          <Link 
+            href="/admin/database" 
+            className="hover:text-accent-color transition-colors"
+          >
+            Database Admin
+          </Link>
           <button 
             onClick={toggleTheme}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-card-background hover:bg-accent-color hover:text-accent-foreground transition-colors"

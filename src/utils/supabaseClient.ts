@@ -307,3 +307,206 @@ export async function deleteJournal(id: number) {
   if (error) throw error;
   return true;
 }
+
+// ===========================
+// Generic CRUD Operations for Database Admin
+// ===========================
+
+type TableName = 'journals' | 'folders' | 'tags' | 'journal_tags';
+
+/**
+ * Get all records from a table
+ */
+export async function getAllRecords(tableName: TableName): Promise<any[]> {
+  const supabase = getSupabaseClient();
+  
+  // For journal_tags, order by composite key instead of 'id'
+  let query = supabase.from(tableName).select('*');
+  
+  if (tableName === 'journal_tags') {
+    query = query.order('journal_id', { ascending: false }).order('tag_id', { ascending: false });
+  } else {
+    query = query.order('id', { ascending: false });
+  }
+  
+  const { data, error } = await query;
+    
+  if (error) {
+    console.error(`Error fetching from ${tableName}:`, error);
+    throw new Error(`Failed to fetch records from ${tableName}: ${error.message}`);
+  }
+  
+  // For journals, decrypt the data
+  if (tableName === 'journals' && data) {
+    const decryptedData = await Promise.all(
+      data.map(async (record) => {
+        try {
+          return await decryptJournalData(record as EncryptedJournalEntry);
+        } catch (err) {
+          console.error('Decryption error for record:', record.id, err);
+          return {
+            ...record,
+            title: '[Decryption Error]',
+            content: '[Decryption Error]',
+            folder: '[Decryption Error]',
+            mood: '',
+            _decryptError: true
+          };
+        }
+      })
+    );
+    return decryptedData;
+  }
+  
+  return data || [];
+}
+
+/**
+ * Create a new record in a table
+ */
+export async function createRecord(tableName: TableName, record: any): Promise<any> {
+  const supabase = getSupabaseClient();
+  
+  // For journals, encrypt the data
+  if (tableName === 'journals') {
+    const encryptedRecord = await encryptJournalData(record as JournalEntry);
+    const { data, error } = await supabase
+      .from(tableName)
+      .insert(encryptedRecord)
+      .select();
+      
+    if (error) {
+      console.error(`Error creating record in ${tableName}:`, error);
+      throw new Error(`Failed to create record in ${tableName}: ${error.message}`);
+    }
+    
+    return data?.[0] ? await decryptJournalData(data[0] as EncryptedJournalEntry) : null;
+  }
+  
+  // For other tables, insert directly
+  const { data, error } = await supabase
+    .from(tableName)
+    .insert(record)
+    .select();
+    
+  if (error) {
+    console.error(`Error creating record in ${tableName}:`, error);
+    throw new Error(`Failed to create record in ${tableName}: ${error.message}`);
+  }
+  
+  return data?.[0];
+}
+
+/**
+ * Update a record in a table
+ */
+export async function updateRecord(tableName: TableName, id: number, updates: any): Promise<any> {
+  const supabase = getSupabaseClient();
+  
+  // For journals, use the existing updateJournal function
+  if (tableName === 'journals') {
+    return await updateJournal(id, updates);
+  }
+  
+  // For journal_tags, use composite key
+  if (tableName === 'journal_tags') {
+    throw new Error('journal_tags table does not support updates. Delete and create a new relation instead.');
+  }
+  
+  // For other tables, update directly
+  const { data, error } = await supabase
+    .from(tableName)
+    .update(updates)
+    .eq('id', id)
+    .select();
+    
+  if (error) {
+    console.error(`Error updating record in ${tableName}:`, error);
+    throw new Error(`Failed to update record in ${tableName}: ${error.message}`);
+  }
+  
+  return data?.[0];
+}
+
+/**
+ * Delete a record from a table
+ */
+export async function deleteRecord(tableName: TableName, id: number | { journal_id: number; tag_id: number }): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  
+  // For journal_tags, use composite key
+  if (tableName === 'journal_tags' && typeof id === 'object') {
+    const { error } = await supabase
+      .from(tableName)
+      .delete()
+      .eq('journal_id', id.journal_id)
+      .eq('tag_id', id.tag_id);
+      
+    if (error) {
+      console.error(`Error deleting record from ${tableName}:`, error);
+      throw new Error(`Failed to delete record from ${tableName}: ${error.message}`);
+    }
+    
+    return true;
+  }
+  
+  // For other tables, use id
+  const { error } = await supabase
+    .from(tableName)
+    .delete()
+    .eq('id', id as number);
+    
+  if (error) {
+    console.error(`Error deleting record from ${tableName}:`, error);
+    throw new Error(`Failed to delete record from ${tableName}: ${error.message}`);
+  }
+  
+  return true;
+}
+
+/**
+ * Get table schema information (for dynamic form generation)
+ */
+export async function getTableSchema(tableName: TableName): Promise<any> {
+  // This is a simplified schema definition
+  // In a real application, you might query Supabase's information_schema
+  const schemas: Record<TableName, any> = {
+    journals: {
+      columns: [
+        { name: 'id', type: 'number', readonly: true },
+        { name: 'date', type: 'date', required: true },
+        { name: 'title', type: 'text', required: true },
+        { name: 'content', type: 'textarea', required: true },
+        { name: 'folder', type: 'text', required: true },
+        { name: 'mood', type: 'text', required: false },
+        { name: 'created_at', type: 'timestamp', readonly: true },
+        { name: 'updated_at', type: 'timestamp', readonly: true }
+      ]
+    },
+    folders: {
+      columns: [
+        { name: 'id', type: 'number', readonly: true },
+        { name: 'name', type: 'text', required: true },
+        { name: 'color', type: 'color', required: true },
+        { name: 'created_at', type: 'timestamp', readonly: true },
+        { name: 'updated_at', type: 'timestamp', readonly: true }
+      ]
+    },
+    tags: {
+      columns: [
+        { name: 'id', type: 'number', readonly: true },
+        { name: 'name', type: 'text', required: true },
+        { name: 'created_at', type: 'timestamp', readonly: true }
+      ]
+    },
+    journal_tags: {
+      columns: [
+        { name: 'journal_id', type: 'number', required: true },
+        { name: 'tag_id', type: 'number', required: true },
+        { name: 'created_at', type: 'timestamp', readonly: true }
+      ]
+    }
+  };
+  
+  return schemas[tableName];
+}
