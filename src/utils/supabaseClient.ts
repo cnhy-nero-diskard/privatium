@@ -111,7 +111,7 @@ export async function getJournals(currentEtag?: string) {
       .select('updated_at')
       .order('updated_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
       
     if (timestampError) {
       console.error('Error getting latest update:', timestampError);
@@ -213,9 +213,16 @@ export async function createJournal(journal: JournalEntry) {
     const encryptedJournal = await encryptJournalData(journal);
     console.log('Encrypted journal mood:', typeof encryptedJournal.mood, encryptedJournal.mood);
     
+    // If created_at is provided (e.g., from CSV import), use it; otherwise let DB default to now()
+    const insertData: any = { ...encryptedJournal };
+    if (journal.created_at) {
+      insertData.created_at = journal.created_at;
+      insertData.updated_at = journal.created_at; // Set updated_at to same as created_at for imports
+    }
+    
     const { data, error } = await supabase
       .from('journals')
-      .insert([encryptedJournal])
+      .insert([insertData])
       .select();
       
     if (error) {

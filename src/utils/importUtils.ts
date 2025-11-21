@@ -1,5 +1,5 @@
 import { getSupabaseClient } from './supabaseClient';
-import { createJournal, getJournals } from './supabaseClient';
+import { createJournal, getJournals, updateJournal } from './supabaseClient';
 import { createTag, addTagToJournal, getJournalTags } from './tagUtils';
 
 interface CSVEntry {
@@ -8,8 +8,10 @@ interface CSVEntry {
   Folder: string;
   Tag: string;
   Mood: string;
-  Location: string;
-  weather?: string; // Optional, will be ignored
+  Text?: string; // Optional content/body (primary)
+  Content?: string; // Optional content/body (fallback)
+  Weather?: string; // Optional, will be ignored
+  Location?: string; // Optional, will be ignored
 }
 
 interface ParsedEntry {
@@ -34,55 +36,81 @@ interface ImportResult {
 }
 
 /**
- * Parse a single CSV line respecting quotes and escaped characters
+ * Robust CSV parser that handles newlines within quoted fields
+ * Parses the entire CSV content at once, respecting quoted fields with newlines
  */
-function parseCSVLine(line: string): string[] {
-  const values: string[] = [];
+function parseCSVContent(csvContent: string): string[][] {
+  const rows: string[][] = [];
+  const chars = csvContent.split('');
   let currentValue = '';
+  let currentRow: string[] = [];
   let insideQuotes = false;
-  let i = 0;
-
-  while (i < line.length) {
-    const char = line[i];
+  
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i];
+    const nextChar = i + 1 < chars.length ? chars[i + 1] : null;
     
     if (char === '"') {
-      // Check for escaped quote (double quote)
-      if (insideQuotes && i + 1 < line.length && line[i + 1] === '"') {
+      // Check for escaped quote (double quote "")
+      if (insideQuotes && nextChar === '"') {
         currentValue += '"';
-        i += 2; // Skip both quotes
-        continue;
+        i++; // Skip the next quote
+      } else {
+        // Toggle quote state
+        insideQuotes = !insideQuotes;
       }
-      // Toggle quote state
-      insideQuotes = !insideQuotes;
-      i++;
     } else if (char === ',' && !insideQuotes) {
       // End of field
-      values.push(currentValue);
+      currentRow.push(currentValue);
       currentValue = '';
-      i++;
+    } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+      // End of row (handle both \n and \r\n)
+      if (char === '\r' && nextChar === '\n') {
+        i++; // Skip \n after \r
+      }
+      // Only add row if it has content
+      if (currentValue || currentRow.length > 0) {
+        currentRow.push(currentValue);
+        if (currentRow.some(val => val.trim())) { // Only add non-empty rows
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        currentValue = '';
+      }
     } else {
+      // Regular character (including newlines inside quotes)
       currentValue += char;
-      i++;
     }
   }
   
-  // Push the last value
-  values.push(currentValue);
+  // Don't forget the last field and row
+  if (currentValue || currentRow.length > 0) {
+    currentRow.push(currentValue);
+    if (currentRow.some(val => val.trim())) {
+      rows.push(currentRow);
+    }
+  }
   
-  return values;
+  return rows;
 }
 
 /**
  * Parse CSV content and convert to journal entries
  */
 export function parseCSV(csvContent: string): ParsedEntry[] {
-  const lines = csvContent.trim().split('\n');
-  if (lines.length === 0) {
+  if (!csvContent || !csvContent.trim()) {
     throw new Error('CSV file is empty');
   }
 
-  // Parse headers
-  const headers = parseCSVLine(lines[0]).map(h => h.trim());
+  // Parse all rows at once, handling newlines within quoted fields
+  const rows = parseCSVContent(csvContent);
+  
+  if (rows.length === 0) {
+    throw new Error('CSV file is empty');
+  }
+
+  // Parse headers (first row)
+  const headers = rows[0].map(h => h.trim());
   
   // Validate required headers
   const requiredHeaders = ['Date', 'Title', 'Folder', 'Tag', 'Mood'];
@@ -93,20 +121,22 @@ export function parseCSV(csvContent: string): ParsedEntry[] {
 
   const entries: ParsedEntry[] = [];
 
-  // Parse each line
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
+  // Parse data rows (skip header row)
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    
     try {
-      // Parse CSV line properly handling quotes
-      const values = parseCSVLine(line);
-
       // Map values to headers
       const entry: any = {};
       headers.forEach((header, index) => {
-        entry[header] = values[index] ? values[index].trim() : '';
+        // Get value, trim it, and handle undefined
+        entry[header] = (row[index] !== undefined ? row[index].trim() : '');
       });
+
+      // Skip completely empty rows
+      if (!entry.Date && !entry.Title && !entry.Folder) {
+        continue;
+      }
 
       // Parse tags - they are comma-separated in the Tag column
       const tags = entry.Tag 
@@ -114,18 +144,18 @@ export function parseCSV(csvContent: string): ParsedEntry[] {
         : [];
 
       // Convert to ParsedEntry format
-      // Use Location as content if available
+      // Support both 'Text' and 'Content' column names, and ignore Location/Weather
       entries.push({
         date: formatDate(entry.Date),
         title: entry.Title || 'Untitled',
-        content: entry.Location || '', // Using Location as the content/body
+        content: entry.Text || entry.Content || '', // Use Text first, fallback to Content
         folder: entry.Folder || 'General',
         mood: normalizeMood(entry.Mood),
         tags,
       });
     } catch (error) {
-      console.error(`Error parsing line ${i + 1}:`, error);
-      // Skip malformed lines
+      console.error(`Error parsing row ${i + 1}:`, error);
+      // Skip malformed rows but continue processing
     }
   }
 
@@ -134,17 +164,31 @@ export function parseCSV(csvContent: string): ParsedEntry[] {
 
 /**
  * Format date to YYYY-MM-DD format
+ * Handles various date formats including "8 JUNE 2025, 09:00 PM"
  */
 function formatDate(dateStr: string): string {
   if (!dateStr) return new Date().toISOString().split('T')[0];
   
   try {
-    const date = new Date(dateStr);
+    // Clean up the date string
+    let cleanedDate = dateStr.trim();
+    
+    // Handle formats like "8 JUNE 2025, 09:00 PM" or "19 NOVEMBER 2024, 08:03 AM"
+    // Remove the comma and time portion if present
+    if (cleanedDate.includes(',')) {
+      const parts = cleanedDate.split(',');
+      cleanedDate = parts[0].trim(); // Take only the date part before comma
+    }
+    
+    // Try to parse the date
+    const date = new Date(cleanedDate);
     if (isNaN(date.getTime())) {
+      console.warn(`Invalid date format: "${dateStr}", using current date`);
       return new Date().toISOString().split('T')[0];
     }
     return date.toISOString().split('T')[0];
-  } catch {
+  } catch (error) {
+    console.warn(`Error parsing date: "${dateStr}", using current date`);
     return new Date().toISOString().split('T')[0];
   }
 }
@@ -247,12 +291,14 @@ export async function importEntries(
     // Import new entries
     for (const entry of newEntries) {
       try {
+        // Set created_at to match the journal date so imported entries have correct timestamps
         const journalEntry = await createJournal({
           date: entry.date,
           title: entry.title,
           content: entry.content,
           folder: entry.folder,
           mood: entry.mood,
+          created_at: new Date(entry.date).toISOString(),
         });
 
         // Add tags
@@ -283,19 +329,15 @@ export async function importEntries(
       
       for (const dup of duplicates) {
         try {
-          // Update the existing entry
-          const { error } = await supabase
-            .from('journals')
-            .update({
-              title: dup.title,
-              content: dup.content,
-              folder: dup.folder,
-              mood: dup.mood,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', dup.existingId);
-
-          if (error) throw error;
+          // Update the existing entry using updateJournal to ensure proper encryption
+          // Set updated_at to match the journal date for consistency
+          await updateJournal(dup.existingId, {
+            title: dup.title,
+            content: dup.content,
+            folder: dup.folder,
+            mood: dup.mood,
+            updated_at: new Date(dup.date).toISOString(),
+          });
 
           // Update tags
           if (dup.tags && dup.tags.length > 0) {
