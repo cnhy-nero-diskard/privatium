@@ -23,10 +23,12 @@ interface FilterSidebarProps {
   selectedFolder: string | null;
   selectedTags: string[];
   selectedMoods: string[];
+  quickNotesMode: 'all' | 'only-quick-notes' | 'mixed';
   onDateChange: (date: string | null) => void;
   onFolderChange: (folder: string | null) => void;
   onTagToggle: (tag: string) => void;
   onMoodToggle: (mood: string) => void;
+  onQuickNotesModeChange: (mode: 'all' | 'only-quick-notes' | 'mixed') => void;
   onClearFilters: () => void;
   onImportComplete: () => void;
 }
@@ -91,10 +93,12 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
   selectedFolder,
   selectedTags,
   selectedMoods,
+  quickNotesMode,
   onDateChange,
   onFolderChange,
   onTagToggle,
   onMoodToggle,
+  onQuickNotesModeChange,
   onClearFilters,
   onImportComplete,
 }) => {
@@ -102,6 +106,7 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const [isFoldersOpen, setIsFoldersOpen] = useState(true);
   const [isTagsOpen, setIsTagsOpen] = useState(true);
   const [isMoodsOpen, setIsMoodsOpen] = useState(true);
+  const [isQuickNotesOpen, setIsQuickNotesOpen] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Start collapsed by default
   
   // Folder management states
@@ -225,7 +230,8 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
     (selectedDate ? 1 : 0) +
     (selectedFolder ? 1 : 0) +
     selectedTags.length +
-    selectedMoods.length;
+    selectedMoods.length +
+    (quickNotesMode !== 'all' ? 1 : 0);
 
   return (
     <>
@@ -579,6 +585,78 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 })
               )}
             </div>
+          </div>
+        </CollapsibleSection>
+
+        {/* Quick Notes Section */}
+        <CollapsibleSection
+          title="Quick Notes"
+          icon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 text-amber-400"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+            </svg>
+          }
+          isOpen={isQuickNotesOpen}
+          onToggle={() => setIsQuickNotesOpen(!isQuickNotesOpen)}
+        >
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400 mb-3">Display options:</p>
+            <button
+              onClick={() => onQuickNotesModeChange('only-quick-notes')}
+              className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-start gap-2 ${
+                quickNotesMode === 'only-quick-notes'
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                  : "bg-gray-700/50 text-gray-300 hover:bg-gray-700 border border-transparent"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 flex-shrink-0 mt-0.5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <div className="text-sm font-medium">Only Quick Notes</div>
+                <div className="text-xs text-gray-400 mt-0.5">Show all quick notes as tiles (not limited to today)</div>
+              </div>
+            </button>
+            <button
+              onClick={() => onQuickNotesModeChange('mixed')}
+              className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-start gap-2 ${
+                quickNotesMode === 'mixed'
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                  : "bg-gray-700/50 text-gray-300 hover:bg-gray-700 border border-transparent"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 flex-shrink-0 mt-0.5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+              </svg>
+              <div className="flex-1">
+                <div className="text-sm font-medium">Mixed View</div>
+                <div className="text-xs text-gray-400 mt-0.5">Quick notes and regular entries together</div>
+              </div>
+            </button>
+            {quickNotesMode !== 'all' && (
+              <button
+                onClick={() => onQuickNotesModeChange('all')}
+                className="w-full text-sm px-3 py-1.5 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Clear Quick Notes Filter
+              </button>
+            )}
           </div>
         </CollapsibleSection>
 

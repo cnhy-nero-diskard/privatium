@@ -53,6 +53,7 @@ const HomePage: React.FC = () => {
 	const [selectedDate, setSelectedDate] = useState<string | null>(null);
 	const [selectedTags, setSelectedTags] = useState<string[]>([]);
 	const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
+	const [quickNotesMode, setQuickNotesMode] = useState<'all' | 'only-quick-notes' | 'mixed'>('all');
 
 	const fetchEntries = async () => {
 		setError(null);
@@ -230,16 +231,27 @@ const HomePage: React.FC = () => {
 		);
 	};
 
+	const handleQuickNotesModeChange = (mode: 'all' | 'only-quick-notes' | 'mixed') => {
+		setQuickNotesMode(mode);
+	};
+
 	const handleClearFilters = () => {
 		setSelectedDate(null);
 		setSelectedFolder(null);
 		setSelectedTags([]);
 		setSelectedMoods([]);
+		setQuickNotesMode('all');
 		setSearchTerm("");
 	};
 
 	// Filter entries based on all active filters
 	const filteredEntries = entries.filter(entry => {
+		// Quick notes mode filter
+		const isQuickNote = !entry.content || entry.content.trim() === '';
+		if (quickNotesMode === 'only-quick-notes' && !isQuickNote) {
+			return false;
+		}
+
 		// Search term filter
 		if (searchTerm && !entry.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
 			!entry.content?.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -276,19 +288,21 @@ const HomePage: React.FC = () => {
 		<>
 			<TopNavigation />
 			<main className="min-h-screen bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex pt-20">
-				<FilterSidebar
-					entries={entries}
-					selectedDate={selectedDate}
-					selectedFolder={selectedFolder}
-					selectedTags={selectedTags}
-					selectedMoods={selectedMoods}
-					onDateChange={handleDateChange}
-					onFolderChange={handleFolderChange}
-					onTagToggle={handleTagToggle}
-					onMoodToggle={handleMoodToggle}
-					onClearFilters={handleClearFilters}
-					onImportComplete={fetchEntries}
-				/>
+			<FilterSidebar
+				entries={entries}
+				selectedDate={selectedDate}
+				selectedFolder={selectedFolder}
+				selectedTags={selectedTags}
+				selectedMoods={selectedMoods}
+				quickNotesMode={quickNotesMode}
+				onDateChange={handleDateChange}
+				onFolderChange={handleFolderChange}
+				onTagToggle={handleTagToggle}
+				onMoodToggle={handleMoodToggle}
+				onQuickNotesModeChange={handleQuickNotesModeChange}
+				onClearFilters={handleClearFilters}
+				onImportComplete={fetchEntries}
+			/>
 				<div className="flex-1 px-0 lg:px-8 overflow-x-hidden">
 					<div className="w-full max-w-6xl mx-auto px-0 lg:px-4">
 						<div className="text-center mb-12 animate-fadeIn">
@@ -410,8 +424,8 @@ const HomePage: React.FC = () => {
 								</div>
 							)}
 							
-							{/* Quick Notes Section */}
-							{(() => {
+							{/* Quick Notes Section - Only show when mode is 'all' (default) */}
+							{quickNotesMode === 'all' && (() => {
 								const isSameDay = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
 
 								// Only show quick notes created today
@@ -428,7 +442,7 @@ const HomePage: React.FC = () => {
 													<path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
 													<path d="M8 11a1 1 0 100-2 1 1 0 000 2zm0 0a1 1 0 000 2m0-2a1 1 0 000-2m0 2a1 1 0 100 2m0-2v1m4-1a1 1 0 100-2 1 1 0 000 2zm0 0a1 1 0 000 2m0-2a1 1 0 000-2m0 2a1 1 0 100 2m0-2v1" />
 												</svg>
-												<h2 className="text-lg font-semibold text-amber-400">Quick Notes</h2>
+												<h2 className="text-lg font-semibold text-amber-400">Quick Notes (Today)</h2>
 												<span className="text-xs px-2 py-0.5 bg-amber-900/50 text-amber-300 rounded-full">{quickNotes.length}</span>
 											</div>
 											
@@ -512,19 +526,34 @@ const HomePage: React.FC = () => {
 								return null;
 							})()}
 
-							<h2 className="text-lg font-semibold text-blue-400 flex items-center gap-2 mb-4">
-								<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-								</svg>
-								Journal Entries
-							</h2>
+							{/* Section Title - changes based on mode */}
+							{quickNotesMode === 'only-quick-notes' ? (
+								<h2 className="text-lg font-semibold text-amber-400 flex items-center gap-2 mb-4">
+									<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+										<path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+									</svg>
+									All Quick Notes
+								</h2>
+							) : (
+								<h2 className="text-lg font-semibold text-blue-400 flex items-center gap-2 mb-4">
+									<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+									</svg>
+									{quickNotesMode === 'mixed' ? 'All Entries' : 'Journal Entries'}
+								</h2>
+							)}
 							<div className="space-y-6">
 								{Object.entries(
 									filteredEntries
-										.filter(entry =>
-											// Filter out quick notes as they're shown in their own section
-											(entry.content && entry.content.trim() !== '')
-										)
+										.filter(entry => {
+											// In 'all' mode (default), filter out quick notes from journal entries section
+											// In 'only-quick-notes' mode, show all (already filtered by filteredEntries)
+											// In 'mixed' mode, show everything
+											if (quickNotesMode === 'all') {
+												return entry.content && entry.content.trim() !== '';
+											}
+											return true;
+										})
 										.reduce((groups: { [key: string]: typeof filteredEntries }, entry) => {
 											const date = new Date(entry.date);
 											const today = new Date();
@@ -574,7 +603,13 @@ const HomePage: React.FC = () => {
 										let entryClasses = `backdrop-blur-sm rounded-lg transition-all duration-300 border w-full max-w-full overflow-hidden
 										    ${multiSelectMode ? ' cursor-default' : ' cursor-pointer'}`;
 
-										if (isQuickNote) {
+										// Apply yellow background to quick notes in 'only-quick-notes' or 'mixed' modes
+										// OR if in 'all' mode and the note is recent (existing behavior)
+										if (isQuickNote && (quickNotesMode === 'only-quick-notes' || quickNotesMode === 'mixed')) {
+											// Always show with yellow background in these modes
+											entryClasses += ' bg-gradient-to-br from-amber-500/60 to-orange-600/50 border-amber-400/50 border-dashed shadow hover:shadow-amber-700/20 hover:-translate-y-1';
+										} else if (isQuickNote && quickNotesMode === 'all') {
+											// Original behavior for 'all' mode - only highlight recent ones
 											entryClasses += isRecent
 												? ' bg-gradient-to-br from-amber-500/80 to-orange-600/70 border-amber-400 border-dashed shadow-lg shadow-amber-700/20 hover:-translate-y-1'
 												: ' bg-gradient-to-br from-amber-600/40 to-orange-700/30 border-amber-500/30 border-dashed shadow hover:shadow-amber-700/10 hover:-translate-y-1';
