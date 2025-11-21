@@ -20,10 +20,11 @@ interface JournalEntry {
   tags?: Tag[];
 }
 
-interface EncryptedJournalEntry extends Omit<JournalEntry, 'title' | 'content' | 'mood'> {
+interface EncryptedJournalEntry extends Omit<JournalEntry, 'title' | 'content' | 'mood' | 'folder'> {
   title: string; // JSON stringified EncryptedData
   content: string; // JSON stringified EncryptedData  
   mood: string; // JSON stringified EncryptedData or plain string
+  folder: string; // JSON stringified EncryptedData
 }
 
 function getEncryptionKey(): string {
@@ -47,10 +48,11 @@ export function getSupabaseClient() {
 
 async function encryptJournalData(journal: JournalEntry): Promise<EncryptedJournalEntry> {
   const key = getEncryptionKey();
-  const [encryptedTitle, encryptedContent, encryptedMood] = await Promise.all([
+  const [encryptedTitle, encryptedContent, encryptedMood, encryptedFolder] = await Promise.all([
     encrypt(journal.title, key),
     encrypt(journal.content, key),
-    encodeMoodForDb(journal.mood, key)
+    encodeMoodForDb(journal.mood, key),
+    encrypt(journal.folder, key)
   ]);
   
   // Ensure all data is properly serialized for database storage
@@ -58,7 +60,8 @@ async function encryptJournalData(journal: JournalEntry): Promise<EncryptedJourn
     ...journal,
     title: JSON.stringify(encryptedTitle),
     content: JSON.stringify(encryptedContent),
-    mood: typeof encryptedMood === 'object' ? JSON.stringify(encryptedMood) : encryptedMood
+    mood: typeof encryptedMood === 'object' ? JSON.stringify(encryptedMood) : encryptedMood,
+    folder: JSON.stringify(encryptedFolder)
   };
 }
 
@@ -83,17 +86,19 @@ async function decryptJournalData(journal: EncryptedJournalEntry): Promise<Journ
     }
   };
 
-  const [title, content, mood] = await Promise.all([
+  const [title, content, mood, folder] = await Promise.all([
     decryptField(journal.title),
     decryptField(journal.content),
-    decodeMoodFromDb(journal.mood, key)
+    decodeMoodFromDb(journal.mood, key),
+    decryptField(journal.folder)
   ]);
   
   return {
     ...journal,
     title,
     content,
-    mood: mood || ''
+    mood: mood || '',
+    folder
   };
 }
 
@@ -240,7 +245,7 @@ export async function updateJournal(id: number, journal: Partial<JournalEntry>) 
   console.log('Updating journal with mood:', journal.mood);
   const supabase = getSupabaseClient();
   
-  // If updating title, content, or mood, encrypt them
+  // If updating title, content, mood, or folder, encrypt them
   const updates: Partial<EncryptedJournalEntry> = { ...journal };
   const key = getEncryptionKey();
   
@@ -264,6 +269,13 @@ export async function updateJournal(id: number, journal: Partial<JournalEntry>) 
     encryptionPromises.push(
       encodeMoodForDb(journal.mood, key).then(encrypted => {
         updates.mood = typeof encrypted === 'object' ? JSON.stringify(encrypted) : encrypted;
+      })
+    );
+  }
+  if (journal.folder) {
+    encryptionPromises.push(
+      encrypt(journal.folder, key).then(encrypted => {
+        updates.folder = JSON.stringify(encrypted);
       })
     );
   }
