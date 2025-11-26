@@ -1,6 +1,8 @@
 import { getSupabaseClient } from './supabaseClient';
 import { createJournal, getJournals, updateJournal } from './supabaseClient';
-import { createTag, addTagToJournal, getJournalTags } from './tagUtils';
+import { createTag, addTagToJournal, getJournalTags, getTags } from './tagUtils';
+import { getFolders, createFolder } from './folderUtils';
+import type { Tag } from '../types/tags';
 
 interface CSVEntry {
   Date: string;
@@ -230,6 +232,60 @@ function normalizeMood(mood: string): string {
 }
 
 /**
+ * Get or create a folder by name (case-insensitive deduplication)
+ * Returns the folder name that was found or created
+ */
+async function ensureFolderExists(folderName: string): Promise<string> {
+  try {
+    const folders = await getFolders();
+    
+    // Check if folder exists (case-insensitive)
+    const existingFolder = folders.find(
+      f => f.name.toLowerCase() === folderName.toLowerCase()
+    );
+    
+    if (existingFolder) {
+      // Return the existing folder's name (preserves casing)
+      return existingFolder.name;
+    }
+    
+    // Create the folder with a default color
+    const newFolder = await createFolder(folderName, '#888888');
+    return newFolder.name;
+  } catch (error) {
+    console.error(`Error ensuring folder "${folderName}" exists:`, error);
+    // Return the original name even if creation fails
+    return folderName;
+  }
+}
+
+/**
+ * Get or create a tag by name (case-insensitive deduplication)
+ * Returns the tag object
+ */
+async function getOrCreateTag(tagName: string, existingTags: Tag[]): Promise<Tag | null> {
+  try {
+    // Check if tag exists (case-insensitive)
+    const existingTag = existingTags.find(
+      t => t.name.toLowerCase() === tagName.toLowerCase()
+    );
+    
+    if (existingTag) {
+      return existingTag;
+    }
+    
+    // Create new tag
+    const newTag = await createTag(tagName);
+    // Add to cache for subsequent lookups in the same import batch
+    existingTags.push(newTag);
+    return newTag;
+  } catch (error) {
+    console.error(`Error creating tag "${tagName}":`, error);
+    return null;
+  }
+}
+
+/**
  * Check for duplicate entries in the database
  */
 export async function checkDuplicates(entries: ParsedEntry[]): Promise<{
@@ -288,25 +344,31 @@ export async function importEntries(
       return result;
     }
 
+    // Pre-load existing tags for deduplication
+    const existingTags = await getTags();
+
     // Import new entries
     for (const entry of newEntries) {
       try {
+        // Ensure folder exists in folders table
+        const folderName = await ensureFolderExists(entry.folder);
+        
         // Set created_at to match the journal date so imported entries have correct timestamps
         const journalEntry = await createJournal({
           date: entry.date,
           title: entry.title,
           content: entry.content,
-          folder: entry.folder,
+          folder: folderName,
           mood: entry.mood,
           created_at: new Date(entry.date).toISOString(),
         });
 
-        // Add tags
+        // Add tags with deduplication
         if (entry.tags && entry.tags.length > 0 && journalEntry && journalEntry.id) {
           for (const tagName of entry.tags) {
             try {
-              // Create or get tag
-              const tag = await createTag(tagName);
+              // Get or create tag (with deduplication)
+              const tag = await getOrCreateTag(tagName, existingTags);
               if (tag && tag.id) {
                 await addTagToJournal(journalEntry.id, tag.id);
               }
@@ -329,17 +391,20 @@ export async function importEntries(
       
       for (const dup of duplicates) {
         try {
+          // Ensure folder exists in folders table
+          const folderName = await ensureFolderExists(dup.folder);
+          
           // Update the existing entry using updateJournal to ensure proper encryption
           // Set updated_at to match the journal date for consistency
           await updateJournal(dup.existingId, {
             title: dup.title,
             content: dup.content,
-            folder: dup.folder,
+            folder: folderName,
             mood: dup.mood,
             updated_at: new Date(dup.date).toISOString(),
           });
 
-          // Update tags
+          // Update tags with deduplication
           if (dup.tags && dup.tags.length > 0) {
             // Remove existing tags
             await supabase
@@ -347,10 +412,10 @@ export async function importEntries(
               .delete()
               .eq('journal_id', dup.existingId);
 
-            // Add new tags
+            // Add new tags (with deduplication)
             for (const tagName of dup.tags) {
               try {
-                const tag = await createTag(tagName);
+                const tag = await getOrCreateTag(tagName, existingTags);
                 if (tag && tag.id) {
                   await addTagToJournal(dup.existingId, tag.id);
                 }
