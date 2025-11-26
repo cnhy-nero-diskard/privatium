@@ -749,40 +749,37 @@ const HomePage: React.FC = () => {
 										})
 										.reduce((groups: { [key: string]: typeof filteredEntries }, entry) => {
 											const date = new Date(entry.date);
-											const today = new Date();
-											const yesterday = new Date(today);
-											yesterday.setDate(yesterday.getDate() - 1);
+											const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+											const monthLabel = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 											
-											let dateKey = entry.date;
-											if (date.toDateString() === today.toDateString()) {
-												dateKey = "Today";
-											} else if (date.toDateString() === yesterday.toDateString()) {
-												dateKey = "Yesterday";
+											if (!groups[monthKey]) {
+												groups[monthKey] = [];
 											}
-											
-											if (!groups[dateKey]) {
-												groups[dateKey] = [];
-											}
-											groups[dateKey].push(entry);
+											groups[monthKey].push(entry);
 											return groups;
 										}, {})
 								)
-									.sort(([dateA], [dateB]) => {
-										const a = dateA === "Today" ? new Date() :
-											dateA === "Yesterday" ? new Date(new Date().setDate(new Date().getDate() - 1)) :
-											new Date(dateA);
-										const b = dateB === "Today" ? new Date() :
-											dateB === "Yesterday" ? new Date(new Date().setDate(new Date().getDate() - 1)) :
-											new Date(dateB);
-										return b.getTime() - a.getTime();
+									.sort(([monthA], [monthB]) => {
+										// Sort by month key in descending order (newest first)
+										return monthB.localeCompare(monthA);
 									})
-									.map(([date, groupEntries]) => (
-										<div key={date} className="space-y-4">
-											<h3 className="text-sm font-medium text-gray-400/70 pl-2 border-l-2 border-gray-700/30">
-												{date}
+									.map(([monthKey, groupEntries]) => {
+										// Format the month label
+										const [year, month] = monthKey.split('-');
+										const monthLabel = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+										
+										// Sort entries within the month by date (newest first)
+										const sortedEntries = [...groupEntries].sort((a, b) => {
+											return new Date(b.date).getTime() - new Date(a.date).getTime();
+										});
+										
+										return (
+										<div key={monthKey} className="space-y-4">
+											<h3 className="text-lg font-semibold text-blue-400/90 pl-3 py-2 border-l-4 border-blue-400/50 bg-gray-800/30 rounded-r">
+												{monthLabel}
 											</h3>
 											<div className="grid gap-4">
-												{groupEntries.map((entry) => {
+												{sortedEntries.map((entry) => {
 										// Check if this is a quick note (no content) and if it's recent (within 24 hours)
 										const isQuickNote = !entry.content || entry.content.trim() === '';
 										
@@ -891,8 +888,8 @@ const HomePage: React.FC = () => {
 								})}
 											</div>
 										</div>
-									))
-								}
+									);
+								})}
 							</div>
 							
 							{/* No journal entries message */}
