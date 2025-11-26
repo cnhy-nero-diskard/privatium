@@ -140,9 +140,18 @@ const HomePage: React.FC = () => {
 			// Append new entries or replace all entries
 			if (resetData) {
 				setEntries(entriesWithoutTags || []);
+				setPage(1); // reset page to 1 since we've loaded the first page
 			} else {
-				setEntries(prev => [...prev, ...(entriesWithoutTags || [])]);
-				setPage(currentPage + 1);
+				// Deduplicate by id to avoid duplicate keys
+				setEntries(prev => {
+					const existingIds = new Set(prev.map(e => e.id));
+					const toAdd = (entriesWithoutTags || []).filter(e => !existingIds.has(e.id));
+					return [...prev, ...toAdd];
+				});
+				// Only increment page if we actually received new entries
+				if ((entriesWithoutTags || []).length > 0) {
+					setPage(currentPage + 1);
+				}
 			}
 		} catch (error) {
 			console.error('Error fetching entries:', error);

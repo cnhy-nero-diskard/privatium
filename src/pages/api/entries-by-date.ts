@@ -72,26 +72,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch tags for all entries
     const entryIds = data.map(entry => entry.id);
     const { data: tagsData, error: tagsError } = await supabase
-      .from('journal_entry_tags')
+      .from('journal_tags')
       .select(`
-        journal_entry_id,
+        journal_id,
         tags (id, name, color)
       `)
-      .in('journal_entry_id', entryIds);
+      .in('journal_id', entryIds);
 
     if (tagsError) {
       console.error('Error fetching tags:', tagsError);
     }
 
-    // Group tags by entry ID
+    // Group tags by entry ID and decrypt tag names
     const tagsByEntryId = new Map();
     if (tagsData) {
-      tagsData.forEach((item: any) => {
-        if (!tagsByEntryId.has(item.journal_entry_id)) {
-          tagsByEntryId.set(item.journal_entry_id, []);
+      const key = getEncryptionKey();
+      const decryptedRows = await Promise.all(
+        tagsData.map(async (item: any) => {
+          if (item && item.tags && item.tags.name) {
+            try {
+              const parsed = JSON.parse(item.tags.name);
+              if (isEncryptedData(parsed)) {
+                const decryptedName = await decrypt(parsed, key);
+                item.tags.name = decryptedName;
+              }
+            } catch {
+              // leave as-is if parsing/decrypt fails (legacy/plaintext)
+            }
+          }
+          return item;
+        })
+      );
+
+      decryptedRows.forEach((item: any) => {
+        if (!tagsByEntryId.has(item.journal_id)) {
+          tagsByEntryId.set(item.journal_id, []);
         }
         if (item.tags) {
-          tagsByEntryId.get(item.journal_entry_id).push(item.tags);
+          tagsByEntryId.get(item.journal_id).push(item.tags);
         }
       });
     }
