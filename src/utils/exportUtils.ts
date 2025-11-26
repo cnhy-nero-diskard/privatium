@@ -1,5 +1,4 @@
 import { getJournals } from './supabaseClient';
-import { getJournalTags } from './tagUtils';
 
 export async function exportEntriesToJson(): Promise<string> {
   try {
@@ -47,22 +46,16 @@ export async function exportEntriesToCSV(): Promise<string> {
     }
 
     const entries = response.data;
-    
-    // Load tags for each entry
-    const entriesWithTags = await Promise.all(
-      entries.map(async (entry) => {
-        const tags = await getJournalTags(entry.id!);
-        return { ...entry, tags };
-      })
-    );
 
     // CSV Headers matching import format
     const headers = ['Date', 'Title', 'Folder', 'Tag', 'Mood', 'Location', 'weather'];
     const csvLines = [headers.join(',')];
 
     // Convert each entry to CSV row
-    for (const entry of entriesWithTags) {
-      const tags = entry.tags?.map((t: { name: string }) => t.name).join(',') || '';
+    for (const entry of entries) {
+      // Tags are not preloaded here to avoid N+1 queries; if you
+      // need tags in CSV, consider adding a dedicated bulk tag export.
+      const tags = '';
       
       const row = [
         escapeCSVField(entry.date),

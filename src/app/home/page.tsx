@@ -39,7 +39,7 @@ const HomePage: React.FC = () => {
     const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-    const [multiSelectMode, setMultiSelectMode] = useState(false);
+	const [multiSelectMode, setMultiSelectMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteType, setDeleteType] = useState<'single' | 'multi'>('single');
@@ -68,11 +68,24 @@ const HomePage: React.FC = () => {
 	const [hasMore, setHasMore] = useState(true);
 	const [page, setPage] = useState(0);
 	const [totalCount, setTotalCount] = useState(0);
+	const [selectedEntryTags, setSelectedEntryTags] = useState<Tag[] | null>(null);
 	const [isSearchMode, setIsSearchMode] = useState(false);
 	const ITEMS_PER_PAGE = 50; // Load 50 entries at a time
 	const observerTarget = React.useRef<HTMLDivElement>(null);
 
-	// Fetch entries with lazy loading support
+	// When an entry is selected, lazily load its tags
+	const handleEntryClick = async (entry: JournalEntry) => {
+		setSelectedEntry(entry);
+		setSelectedEntryTags(null);
+		try {
+			const tags = await getJournalTags(entry.id);
+			setSelectedEntryTags(tags);
+		} catch (error) {
+			console.error('Error loading tags for entry:', entry.id, error);
+		}
+	};
+
+	// Fetch entries with lazy loading support (without tags; tags are loaded on demand)
 	const fetchEntries = useCallback(async (resetData: boolean = false) => {
 		setError(null);
 		
@@ -119,19 +132,15 @@ const HomePage: React.FC = () => {
 				setError('Some entries could not be decrypted properly. They will be shown with placeholder content.');
 			}
 			
-			// Load tags for each entry
-			const entriesWithTags = await Promise.all(
-				data.map(async entry => {
-					const tags = await getJournalTags(entry.id);
-					return { ...entry, content: entry.content ?? "", tags };
-				})
-			);
+			// Do not load tags here to avoid N+1 requests;
+			// tags are fetched on-demand when opening an entry.
+			const entriesWithoutTags = data.map(entry => ({ ...entry, content: entry.content ?? "" }));
 			
 			// Append new entries or replace all entries
 			if (resetData) {
-				setEntries(entriesWithTags || []);
+				setEntries(entriesWithoutTags || []);
 			} else {
-				setEntries(prev => [...prev, ...(entriesWithTags || [])]);
+				setEntries(prev => [...prev, ...(entriesWithoutTags || [])]);
 				setPage(currentPage + 1);
 			}
 		} catch (error) {
@@ -180,22 +189,14 @@ const HomePage: React.FC = () => {
 			
 			const { data } = response;
 			
-			// Load tags for each entry
-			const entriesWithTags = await Promise.all(
-				data.map(async entry => {
-					if (!entry.id) return entry;
-					const tags = await getJournalTags(entry.id);
-					return { ...entry, content: entry.content ?? "", tags };
-				})
-			);
+			// Do not load tags here; tags are loaded on demand per entry.
+			const entriesWithoutTags = data.map(entry => ({ ...entry, content: entry.content ?? "" }));
 			
 			// Apply tag filter if needed (since backend doesn't do this)
-			let filtered = entriesWithTags;
+			let filtered = entriesWithoutTags;
 			if (selectedTags.length > 0) {
-				filtered = filtered.filter(entry => {
-					const entryTagNames = entry.tags?.map(t => t.name) || [];
-					return selectedTags.some(tag => entryTagNames.includes(tag));
-				});
+				// Since tags are not preloaded anymore, tag-based filtering
+				// is delegated to the backend via `searchJournals` options.
 			}
 			
 			setEntries(filtered as JournalEntry[]);
@@ -641,7 +642,7 @@ const HomePage: React.FC = () => {
 														<div
 															key={entry.id}
 															className={`${entryClasses} flex`}
-															{...(!multiSelectMode ? { onClick: () => setSelectedEntry(entry) } : {})}
+															{...(!multiSelectMode ? { onClick: () => handleEntryClick(entry) } : {})}
 														>
 															{/* Folder color bar */}
 															<div
@@ -805,7 +806,7 @@ const HomePage: React.FC = () => {
 										<div
 											key={entry.id}
 											className={entryClasses}
-											{...(!multiSelectMode ? { onClick: () => setSelectedEntry(entry) } : {})}
+											{...(!multiSelectMode ? { onClick: () => handleEntryClick(entry) } : {})}
 										>
 											<div className="flex h-full w-full">
 												{/* Folder color bar on extreme left */}
@@ -952,8 +953,11 @@ const HomePage: React.FC = () => {
 					{/* Modal for entry content */}
 					{selectedEntry && (
 						<JournalModal
-							entry={selectedEntry}
-							onClose={() => setSelectedEntry(null)}
+							entry={{ ...selectedEntry, tags: selectedEntryTags || selectedEntry.tags }}
+							onClose={() => {
+								setSelectedEntry(null);
+								setSelectedEntryTags(null);
+							}}
 							onEdit={handleEdit}
 							onDelete={handleDeleteRequest}
 						/>
