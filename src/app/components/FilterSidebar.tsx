@@ -6,6 +6,7 @@ import { Tag } from "@/types/tags";
 import ExportButton from "@/components/ExportButton";
 import ImportButton from "@/components/ImportButton";
 import { getFolders, createFolder, deleteFolder, updateFolder, type Folder } from "@/utils/folderUtils";
+import { getTagsWithCounts } from "@/utils/tagUtils";
 
 interface JournalEntry {
   id: number;
@@ -118,10 +119,23 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const [editFolderName, setEditFolderName] = useState("");
   const [editFolderColor, setEditFolderColor] = useState("#3B82F6");
   
-  // Load folders on mount
+  // Tag management states
+  const [tagsWithCounts, setTagsWithCounts] = useState<Array<{ tag: string; count: number }>>([]);
+  const [loadingTags, setLoadingTags] = useState(false);
+  
+  // Load folders and tags on mount
   useEffect(() => {
     loadFolders();
+    loadTags();
   }, []);
+  
+  // Reload tags when entries change (e.g., after import, add, edit, or delete)
+  useEffect(() => {
+    // Only reload if we have entries loaded
+    if (entries.length > 0 || tagsWithCounts.length > 0) {
+      loadTags();
+    }
+  }, [entries.length]); // Only reload when the count changes to avoid unnecessary reloads
   
   const loadFolders = async () => {
     try {
@@ -129,6 +143,18 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
       setFolders(loadedFolders);
     } catch (error) {
       console.error("Failed to load folders:", error);
+    }
+  };
+  
+  const loadTags = async () => {
+    try {
+      setLoadingTags(true);
+      const tags = await getTagsWithCounts();
+      setTagsWithCounts(tags);
+    } catch (error) {
+      console.error("Failed to load tags:", error);
+    } finally {
+      setLoadingTags(false);
     }
   };
   
@@ -144,6 +170,11 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
     } catch (error) {
       console.error("Failed to create folder:", error);
     }
+  };
+  
+  const handleImportComplete = () => {
+    loadTags(); // Reload tags after import
+    onImportComplete(); // Call parent's callback
   };
   
   const handleDeleteFolder = async (folderId: number) => {
@@ -188,20 +219,6 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
     return Object.entries(stats)
       .map(([folder, count]) => ({ folder, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [entries]);
-
-  // Calculate tag statistics
-  const tagStats = useMemo(() => {
-    const stats = entries.reduce((acc, entry) => {
-      entry.tags?.forEach((tag) => {
-        acc[tag.name] = (acc[tag.name] || 0) + 1;
-      });
-      return acc;
-    }, {} as Record<string, number>);
-
-    return Object.entries(stats)
-      .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count);
   }, [entries]);
 
@@ -302,7 +319,7 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
           </h3>
           <div className="space-y-2">
             <ExportButton />
-            <ImportButton onImportComplete={onImportComplete} />
+            <ImportButton onImportComplete={handleImportComplete} />
           </div>
         </div>
 
@@ -681,13 +698,15 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
           }
           isOpen={isTagsOpen}
           onToggle={() => setIsTagsOpen(!isTagsOpen)}
-          count={tagStats.length}
+          count={tagsWithCounts.length}
         >
           <div className="space-y-1">
-            {tagStats.length === 0 ? (
+            {loadingTags ? (
+              <p className="text-sm text-gray-500 text-center py-4">Loading tags...</p>
+            ) : tagsWithCounts.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">No tags yet</p>
             ) : (
-              tagStats.map(({ tag, count }) => {
+              tagsWithCounts.map(({ tag, count }) => {
                 const isSelected = selectedTags.includes(tag);
                 return (
                   <button

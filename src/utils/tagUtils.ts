@@ -147,3 +147,49 @@ export async function searchTags(query: string): Promise<Tag[]> {
     tag.name.toLowerCase().includes(queryLower)
   );
 }
+
+export async function getTagsWithCounts(): Promise<Array<{ tag: string; count: number }>> {
+  const supabase = getSupabaseClient();
+  const key = getEncryptionKey();
+  
+  // Get all tags with their journal counts using a join
+  const { data, error } = await supabase
+    .from('tags')
+    .select('id, name, journal_tags(journal_id)');
+
+  if (error) throw error;
+  if (!data) return [];
+  
+  // Decrypt tag names and count journals
+  const tagsWithCounts = await Promise.all(
+    data.map(async (tag: any) => {
+      try {
+        const parsed = JSON.parse(tag.name);
+        let decryptedName = tag.name;
+        
+        if (isEncryptedData(parsed)) {
+          decryptedName = await decrypt(parsed, key);
+        }
+        
+        // Count the number of journals associated with this tag
+        const count = tag.journal_tags?.length || 0;
+        
+        return {
+          tag: decryptedName,
+          count: count
+        };
+      } catch {
+        // If parsing fails, it might be plain text (legacy)
+        return {
+          tag: tag.name,
+          count: tag.journal_tags?.length || 0
+        };
+      }
+    })
+  );
+  
+  // Filter out tags with zero count and sort by count descending
+  return tagsWithCounts
+    .filter(t => t.count > 0)
+    .sort((a, b) => b.count - a.count);
+}
