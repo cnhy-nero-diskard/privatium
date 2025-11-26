@@ -8,7 +8,7 @@ import { getJournalTags } from "@/utils/tagUtils";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { MoodIcon } from "../components/MoodIcon";
 import AITherapistSummary from "../components/AITherapistSummary";
-import { groupEntriesByMonth, formatMonthKey, getEntriesForMonth, getCurrentMonthKey } from "@/utils/dateUtils";
+import { groupEntriesByMonth, formatMonthKey, getEntriesForMonth, getCurrentMonthKey, getEntriesForLastMonths, getEntriesForLastYears, getEntriesForDateRange, formatDateRangeDescription, getAllAvailableMonths } from "@/utils/dateUtils";
 import FilterSidebar from "../components/FilterSidebar";
 import { getFolders, type Folder } from "@/utils/folderUtils";
 
@@ -46,6 +46,14 @@ const HomePage: React.FC = () => {
     const [currentEtag, setCurrentEtag] = useState<string | null>(null);	const [error, setError] = useState<string | null>(null);
     const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthKey());
     const [monthlyEntries, setMonthlyEntries] = useState<JournalEntry[]>([]);
+	// Date range selector states
+	const [rangeType, setRangeType] = useState<'single' | 'lastMonths' | 'lastYears' | 'custom'>('single');
+	const [monthsCount, setMonthsCount] = useState<number>(3);
+	const [yearsCount, setYearsCount] = useState<number>(1);
+	const [customStartMonth, setCustomStartMonth] = useState<string>(getCurrentMonthKey());
+	const [customEndMonth, setCustomEndMonth] = useState<string>(getCurrentMonthKey());
+	const [pickerYear, setPickerYear] = useState<number>(new Date().getFullYear());
+	const [customRangePickerYear, setCustomRangePickerYear] = useState<number>(new Date().getFullYear());
 	const [folders, setFolders] = useState<Folder[]>([]);
 	const [isAISidebarCollapsed, setIsAISidebarCollapsed] = useState(false);
 	
@@ -257,15 +265,31 @@ const HomePage: React.FC = () => {
 		return folder?.color || '#6B7280'; // Default gray color
 	};
 
-	// Update monthly entries when selected month or entries change
+	// Update monthly entries based on selected range type
 	useEffect(() => {
-		if (entries.length > 0 && selectedMonth) {
-			const filteredEntries = getEntriesForMonth(entries, selectedMonth);
+		if (entries.length > 0) {
+			let filteredEntries: JournalEntry[] = [];
+			
+			switch (rangeType) {
+				case 'single':
+					filteredEntries = getEntriesForMonth(entries, selectedMonth);
+					break;
+				case 'lastMonths':
+					filteredEntries = getEntriesForLastMonths(entries, monthsCount);
+					break;
+				case 'lastYears':
+					filteredEntries = getEntriesForLastYears(entries, yearsCount);
+					break;
+				case 'custom':
+					filteredEntries = getEntriesForDateRange(entries, customStartMonth, customEndMonth);
+					break;
+			}
+			
 			setMonthlyEntries(filteredEntries);
 		} else {
 			setMonthlyEntries([]);
 		}
-	}, [entries, selectedMonth]);
+	}, [entries, rangeType, selectedMonth, monthsCount, yearsCount, customStartMonth, customEndMonth]);
 
 	// Handler for editing an entry
 	const handleEdit = async (updatedEntry: any) => {
@@ -981,28 +1005,202 @@ const HomePage: React.FC = () => {
 					{!isAISidebarCollapsed && (
 						<>
 							
-							<div className="mb-4">
-								<label htmlFor="month-select-sidebar" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-									Select Month:
-								</label>
-								<select
-									id="month-select-sidebar"
-									value={selectedMonth}
-									onChange={(e) => setSelectedMonth(e.target.value)}
-									className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+					
+					<div className="mb-4 space-y-3">
+						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+							Date Range:
+						</label>
+						
+						{/* Range Type Selector */}
+						<select
+							value={rangeType}
+							onChange={(e) => setRangeType(e.target.value as any)}
+							className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+						>
+							<option value="single">Single Month</option>
+							<option value="lastMonths">Last X Months</option>
+							<option value="lastYears">Last X Years</option>
+							<option value="custom">Custom Range</option>
+						</select>
+						
+					{/* Single Month Selector */}
+					{rangeType === 'single' && (
+						<div className="space-y-3">
+							{/* Year Selector */}
+							<div className="flex items-center justify-between gap-2">
+								<button
+									onClick={() => setPickerYear(pickerYear - 1)}
+									className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
 								>
-									{Object.keys(groupEntriesByMonth(entries))
-										.sort((a, b) => b.localeCompare(a))
-										.map((monthKey) => (
-											<option key={monthKey} value={monthKey}>
-												{formatMonthKey(monthKey)}
-											</option>
-										))
-									}
-								</select>
+									←
+								</button>
+								<span className="font-semibold text-gray-700 dark:text-gray-300">{pickerYear}</span>
+								<button
+									onClick={() => setPickerYear(pickerYear + 1)}
+									className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+								>
+									→
+								</button>
+							</div>
+							{/* Month Grid */}
+							<div className="grid grid-cols-3 gap-2">
+								{Array.from({ length: 12 }, (_, i) => {
+									const monthNum = i + 1;
+									const monthKey = `${pickerYear}-${monthNum.toString().padStart(2, '0')}`;
+									const entryCount = getEntriesForMonth(entries, monthKey).length;
+									const isSelected = selectedMonth === monthKey;
+									const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+									
+									return (
+										<button
+											key={monthKey}
+											onClick={() => setSelectedMonth(monthKey)}
+											className={`p-2 rounded-lg text-sm font-medium transition-colors ${
+												isSelected
+													? 'bg-purple-500 text-white'
+													: entryCount > 0
+													? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50'
+													: 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+											}`}
+										>
+											<div>{monthNames[i]}</div>
+											{entryCount > 0 && (
+												<div className="text-xs mt-0.5">{entryCount}</div>
+											)}
+										</button>
+									);
+								})}
+							</div>
+						</div>
+					)}						{/* Last X Months Selector */}
+						{rangeType === 'lastMonths' && (
+							<div className="flex items-center space-x-2">
+								<label className="text-sm text-gray-600 dark:text-gray-400">Last</label>
+								<input
+									type="number"
+									min="1"
+									max="36"
+									value={monthsCount}
+									onChange={(e) => setMonthsCount(Math.max(1, Math.min(36, parseInt(e.target.value) || 1)))}
+									className="w-20 px-2 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+								/>
+								<label className="text-sm text-gray-600 dark:text-gray-400">months</label>
+							</div>
+						)}
+						
+						{/* Last X Years Selector */}
+						{rangeType === 'lastYears' && (
+							<div className="flex items-center space-x-2">
+								<label className="text-sm text-gray-600 dark:text-gray-400">Last</label>
+								<input
+									type="number"
+									min="1"
+									max="10"
+									value={yearsCount}
+									onChange={(e) => setYearsCount(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+									className="w-20 px-2 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+								/>
+								<label className="text-sm text-gray-600 dark:text-gray-400">years</label>
+							</div>
+						)}
+						
+					{/* Custom Range Selector */}
+					{rangeType === 'custom' && (
+						<div className="space-y-3">
+							{/* Year Selector */}
+							<div className="flex items-center justify-between gap-2">
+								<button
+									onClick={() => setCustomRangePickerYear(customRangePickerYear - 1)}
+									className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+								>
+									←
+								</button>
+								<span className="font-semibold text-gray-700 dark:text-gray-300">{customRangePickerYear}</span>
+								<button
+									onClick={() => setCustomRangePickerYear(customRangePickerYear + 1)}
+									className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+								>
+									→
+								</button>
 							</div>
 							
-							<AITherapistSummary 
+							{/* Start Month Selection */}
+							<div>
+								<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">From:</label>
+								<div className="grid grid-cols-3 gap-2">
+									{Array.from({ length: 12 }, (_, i) => {
+										const monthNum = i + 1;
+										const monthKey = `${customRangePickerYear}-${monthNum.toString().padStart(2, '0')}`;
+										const entryCount = getEntriesForMonth(entries, monthKey).length;
+										const isSelected = customStartMonth === monthKey;
+										const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+										
+										return (
+											<button
+												key={monthKey}
+												onClick={() => setCustomStartMonth(monthKey)}
+												className={`p-2 rounded-lg text-xs font-medium transition-colors ${
+													isSelected
+														? 'bg-green-500 text-white ring-2 ring-green-600'
+														: entryCount > 0
+														? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
+														: 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+												}`}
+											>
+												<div>{monthNames[i]}</div>
+												{entryCount > 0 && (
+													<div className="text-xs mt-0.5">{entryCount}</div>
+												)}
+											</button>
+										);
+									})}
+								</div>
+							</div>
+							
+							{/* End Month Selection */}
+							<div>
+								<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">To:</label>
+								<div className="grid grid-cols-3 gap-2">
+									{Array.from({ length: 12 }, (_, i) => {
+										const monthNum = i + 1;
+										const monthKey = `${customRangePickerYear}-${monthNum.toString().padStart(2, '0')}`;
+										const entryCount = getEntriesForMonth(entries, monthKey).length;
+										const isSelected = customEndMonth === monthKey;
+										const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+										
+										return (
+											<button
+												key={monthKey}
+												onClick={() => setCustomEndMonth(monthKey)}
+												className={`p-2 rounded-lg text-xs font-medium transition-colors ${
+													isSelected
+														? 'bg-blue-500 text-white ring-2 ring-blue-600'
+														: entryCount > 0
+														? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+														: 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+												}`}
+											>
+												<div>{monthNames[i]}</div>
+												{entryCount > 0 && (
+													<div className="text-xs mt-0.5">{entryCount}</div>
+												)}
+											</button>
+										);
+									})}
+								</div>
+							</div>
+						</div>
+					)}						{/* Display selected range info */}
+						<div className="text-xs text-gray-500 dark:text-gray-400 mt-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded">
+							<span className="font-medium">Selected: </span>
+							{rangeType === 'single' && formatMonthKey(selectedMonth)}
+							{rangeType === 'lastMonths' && `Last ${monthsCount} month${monthsCount > 1 ? 's' : ''}`}
+							{rangeType === 'lastYears' && `Last ${yearsCount} year${yearsCount > 1 ? 's' : ''}`}
+							{rangeType === 'custom' && `${formatMonthKey(customStartMonth)} - ${formatMonthKey(customEndMonth)}`}
+							<br />
+							<span className="font-medium">{monthlyEntries.length}</span> entries found
+						</div>
+					</div>							<AITherapistSummary 
 								entries={monthlyEntries} 
 								month={formatMonthKey(selectedMonth).split(' ')[0]} 
 								year={parseInt(selectedMonth.split('-')[0])} 

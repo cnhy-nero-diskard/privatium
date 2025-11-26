@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { entries, month, year } = req.body;
+    const { entries, month, year, rangeDescription } = req.body;
 
     if (!entries || !Array.isArray(entries) || entries.length === 0) {
       return res.status(400).json({ message: 'Invalid entries data' });
@@ -66,7 +66,7 @@ Use [] for empty arrays. Never mention you're an AI or reference "the journal en
       },
       {
         role: "user",
-        content: `Please provide your therapeutic insights for ${month} ${year} based on these journal entries:\n\n${formattedEntries}`
+        content: `Please provide your therapeutic insights for ${rangeDescription || `${month} ${year}`} based on these journal entries:\n\n${formattedEntries}`
       }
     ];
 

@@ -17,6 +17,7 @@ interface AITherapistSummaryProps {
   entries: Entry[];
   month: string;
   year: number;
+  rangeDescription?: string;
 }
 
 interface TherapistInsights {
@@ -28,14 +29,14 @@ interface TherapistInsights {
   focusPrompt: string;
 }
 
-const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ entries, month, year }) => {
+const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ entries, month, year, rangeDescription }) => {
   const [insights, setInsights] = useState<TherapistInsights | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const generateSummary = async () => {
     if (entries.length === 0) {
-      setError("No entries available for the selected month.");
+      setError("No entries available for the selected range.");
       setInsights(null);
       return;
     }
@@ -60,7 +61,8 @@ const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ entries, month,
         body: JSON.stringify({ 
           entries: entriesForAI,
           month,
-          year
+          year,
+          rangeDescription: rangeDescription || `${month} ${year}`
         })
       });
 
@@ -118,7 +120,7 @@ const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ entries, month,
 
       {!insights && !error && !loading && (
         <div className="text-gray-500 dark:text-gray-400 italic">
-          Click "Generate Insights" to get a therapist's perspective on your journal entries for {month} {year}.
+          Click "Generate Insights" to get a therapist's perspective on your journal entries for {rangeDescription || `${month} ${year}`}.
         </div>
       )}
 
