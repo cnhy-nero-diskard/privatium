@@ -8,7 +8,7 @@ import { getJournalTags } from "@/utils/tagUtils";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import { MoodIcon } from "../components/MoodIcon";
 import AITherapistSummary from "../components/AITherapistSummary";
-import { groupEntriesByMonth, formatMonthKey, getEntriesForMonth, getCurrentMonthKey, getEntriesForLastMonths, getEntriesForLastYears, getEntriesForDateRange, formatDateRangeDescription, getAllAvailableMonths } from "@/utils/dateUtils";
+import { groupEntriesByMonth, formatMonthKey, getEntriesForMonth, getCurrentMonthKey, getEntriesForLastMonths, getEntriesForLastYears, getEntriesForDateRange, formatDateRangeDescription, getAllAvailableMonths, calculateDateRange } from "@/utils/dateUtils";
 import FilterSidebar from "../components/FilterSidebar";
 import { getFolders, type Folder } from "@/utils/folderUtils";
 
@@ -56,6 +56,7 @@ const HomePage: React.FC = () => {
 	const [customRangePickerYear, setCustomRangePickerYear] = useState<number>(new Date().getFullYear());
 	const [folders, setFolders] = useState<Folder[]>([]);
 	const [isAISidebarCollapsed, setIsAISidebarCollapsed] = useState(false);
+	const [availableMonths, setAvailableMonths] = useState<Array<{ month: string; count: number }>>([]);
 	
 	// Filter states
 	const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -210,10 +211,24 @@ const HomePage: React.FC = () => {
 		}
 	};
 
+	// Load available months for AI therapist date selector
+	const loadAvailableMonths = async () => {
+		try {
+			const response = await fetch('/api/available-months');
+			if (response.ok) {
+				const { months } = await response.json();
+				setAvailableMonths(months || []);
+			}
+		} catch (error) {
+			console.error('Failed to load available months:', error);
+		}
+	};
+
 	// Initial load
 	useEffect(() => {
 		fetchEntries(true);
 		loadFolders();
+		loadAvailableMonths();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -1051,7 +1066,9 @@ const HomePage: React.FC = () => {
 								{Array.from({ length: 12 }, (_, i) => {
 									const monthNum = i + 1;
 									const monthKey = `${pickerYear}-${monthNum.toString().padStart(2, '0')}`;
-									const entryCount = getEntriesForMonth(entries, monthKey).length;
+									// Use availableMonths from the API instead of paginated entries
+									const monthData = availableMonths.find(m => m.month === monthKey);
+									const entryCount = monthData?.count || 0;
 									const isSelected = selectedMonth === monthKey;
 									const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 									
@@ -1135,7 +1152,8 @@ const HomePage: React.FC = () => {
 									{Array.from({ length: 12 }, (_, i) => {
 										const monthNum = i + 1;
 										const monthKey = `${customRangePickerYear}-${monthNum.toString().padStart(2, '0')}`;
-										const entryCount = getEntriesForMonth(entries, monthKey).length;
+										const monthData = availableMonths.find(m => m.month === monthKey);
+										const entryCount = monthData?.count || 0;
 										const isSelected = customStartMonth === monthKey;
 										const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 										
@@ -1168,7 +1186,8 @@ const HomePage: React.FC = () => {
 									{Array.from({ length: 12 }, (_, i) => {
 										const monthNum = i + 1;
 										const monthKey = `${customRangePickerYear}-${monthNum.toString().padStart(2, '0')}`;
-										const entryCount = getEntriesForMonth(entries, monthKey).length;
+										const monthData = availableMonths.find(m => m.month === monthKey);
+										const entryCount = monthData?.count || 0;
 										const isSelected = customEndMonth === monthKey;
 										const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 										
@@ -1201,13 +1220,23 @@ const HomePage: React.FC = () => {
 							{rangeType === 'lastMonths' && `Last ${monthsCount} month${monthsCount > 1 ? 's' : ''}`}
 							{rangeType === 'lastYears' && `Last ${yearsCount} year${yearsCount > 1 ? 's' : ''}`}
 							{rangeType === 'custom' && `${formatMonthKey(customStartMonth)} - ${formatMonthKey(customEndMonth)}`}
-							<br />
-							<span className="font-medium">{monthlyEntries.length}</span> entries found
 						</div>
 					</div>							<AITherapistSummary 
-								entries={monthlyEntries} 
-								month={formatMonthKey(selectedMonth).split(' ')[0]} 
-								year={parseInt(selectedMonth.split('-')[0])} 
+								{...(() => {
+									const range = calculateDateRange(rangeType, {
+										selectedMonth,
+										monthsCount,
+										yearsCount,
+										customStartMonth,
+										customEndMonth
+									});
+									return {
+										startDate: range.startDate,
+										endDate: range.endDate,
+										rangeDescription: range.description,
+										rangeType
+									};
+								})()}
 							/>
 						</>
 					)}

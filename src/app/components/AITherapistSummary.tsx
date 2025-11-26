@@ -14,10 +14,10 @@ interface Entry {
 }
 
 interface AITherapistSummaryProps {
-  entries: Entry[];
-  month: string;
-  year: number;
-  rangeDescription?: string;
+  startDate: string; // YYYY-MM-DD format
+  endDate: string;   // YYYY-MM-DD format
+  rangeDescription: string;
+  rangeType: 'single' | 'lastMonths' | 'lastYears' | 'custom';
 }
 
 interface TherapistInsights {
@@ -29,24 +29,42 @@ interface TherapistInsights {
   focusPrompt: string;
 }
 
-const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ entries, month, year, rangeDescription }) => {
+const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ startDate, endDate, rangeDescription, rangeType }) => {
   const [insights, setInsights] = useState<TherapistInsights | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [entryCount, setEntryCount] = useState<number | null>(null);
 
   const generateSummary = async () => {
-    if (entries.length === 0) {
-      setError("No entries available for the selected range.");
-      setInsights(null);
-      return;
-    }
-
     setLoading(true);
     setError(null);
+    setInsights(null);
 
     try {
+      // First, fetch the entries for the selected date range from the database
+      const entriesResponse = await fetch('/api/entries-by-date', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate, rangeType })
+      });
+
+      if (!entriesResponse.ok) {
+        throw new Error(`Failed to fetch entries: ${entriesResponse.status}`);
+      }
+
+      const { entries } = await entriesResponse.json();
+
+      if (!entries || entries.length === 0) {
+        setError("No entries available for the selected range.");
+        setInsights(null);
+        setEntryCount(0);
+        return;
+      }
+
+      setEntryCount(entries.length);
+
       // Prepare the entries data in a format suitable for the AI
-      const entriesForAI = entries.map(entry => ({
+      const entriesForAI = entries.map((entry: Entry) => ({
         date: entry.date,
         title: entry.title,
         content: entry.content,
@@ -54,15 +72,15 @@ const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ entries, month,
         tags: entry.tags?.map((tag: { name: string }) => tag.name)
       }));
 
-      // Call the API endpoint we'll create
+      // Call the AI therapist API endpoint
       const response = await fetch('/api/ai-therapist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           entries: entriesForAI,
-          month,
-          year,
-          rangeDescription: rangeDescription || `${month} ${year}`
+          month: '',
+          year: 0,
+          rangeDescription
         })
       });
 
@@ -94,9 +112,9 @@ const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ entries, month,
         </h2>
         <button
           onClick={generateSummary}
-          disabled={loading || entries.length === 0}
+          disabled={loading}
           className={`px-4 py-2 rounded-lg flex items-center ${
-            loading || entries.length === 0
+            loading
               ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
               : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
           }`}
@@ -120,7 +138,12 @@ const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ entries, month,
 
       {!insights && !error && !loading && (
         <div className="text-gray-500 dark:text-gray-400 italic">
-          Click "Generate Insights" to get a therapist's perspective on your journal entries for {rangeDescription || `${month} ${year}`}.
+          Click "Generate Insights" to get a therapist's perspective on your journal entries for {rangeDescription}.
+          {entryCount !== null && entryCount === 0 && (
+            <div className="mt-2 text-amber-600 dark:text-amber-400">
+              No entries found for this date range.
+            </div>
+          )}
         </div>
       )}
 

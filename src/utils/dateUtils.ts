@@ -175,3 +175,81 @@ export function formatDateRangeDescription(rangeType: string, value: any): strin
       return 'Unknown range';
   }
 }
+
+/**
+ * Calculate start and end dates (YYYY-MM-DD) for a date range
+ * @param rangeType The type of range selected
+ * @param params Parameters specific to the range type
+ * @returns Object with startDate and endDate in YYYY-MM-DD format
+ */
+export function calculateDateRange(
+  rangeType: 'single' | 'lastMonths' | 'lastYears' | 'custom',
+  params: {
+    selectedMonth?: string;
+    monthsCount?: number;
+    yearsCount?: number;
+    customStartMonth?: string;
+    customEndMonth?: string;
+  }
+): { startDate: string; endDate: string; description: string } {
+  const now = new Date();
+  
+  switch (rangeType) {
+    case 'single': {
+      const [year, month] = params.selectedMonth!.split('-').map(Number);
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0); // Last day of the month
+      return {
+        startDate: formatDateToYYYYMMDD(startDate),
+        endDate: formatDateToYYYYMMDD(endDate),
+        description: formatMonthKey(params.selectedMonth!)
+      };
+    }
+    
+    case 'lastMonths': {
+      const count = params.monthsCount || 1;
+      const startDate = new Date(now.getFullYear(), now.getMonth() - count + 1, 1);
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+      return {
+        startDate: formatDateToYYYYMMDD(startDate),
+        endDate: formatDateToYYYYMMDD(endDate),
+        description: `Last ${count} month${count > 1 ? 's' : ''}`
+      };
+    }
+    
+    case 'lastYears': {
+      const count = params.yearsCount || 1;
+      const startDate = new Date(now.getFullYear() - count + 1, 0, 1);
+      const endDate = new Date(now.getFullYear(), 11, 31); // Last day of current year
+      return {
+        startDate: formatDateToYYYYMMDD(startDate),
+        endDate: formatDateToYYYYMMDD(endDate),
+        description: `Last ${count} year${count > 1 ? 's' : ''}`
+      };
+    }
+    
+    case 'custom': {
+      const [startYear, startMonth] = params.customStartMonth!.split('-').map(Number);
+      const [endYear, endMonth] = params.customEndMonth!.split('-').map(Number);
+      const startDate = new Date(startYear, startMonth - 1, 1);
+      const endDate = new Date(endYear, endMonth, 0); // Last day of end month
+      return {
+        startDate: formatDateToYYYYMMDD(startDate),
+        endDate: formatDateToYYYYMMDD(endDate),
+        description: `${formatMonthKey(params.customStartMonth!)} - ${formatMonthKey(params.customEndMonth!)}`
+      };
+    }
+  }
+}
+
+/**
+ * Format a Date object to YYYY-MM-DD string
+ * @param date The date to format
+ * @returns Date string in YYYY-MM-DD format
+ */
+function formatDateToYYYYMMDD(date: Date): string {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
