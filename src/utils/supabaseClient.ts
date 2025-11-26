@@ -627,3 +627,88 @@ export async function getTableSchema(tableName: TableName): Promise<any> {
   
   return schemas[tableName];
 }
+
+/**
+ * Wipe all data from the database (DESTRUCTIVE - use with caution)
+ * This function deletes all data from all tables in the correct order to respect foreign key constraints
+ */
+export async function wipeDatabase(): Promise<{ success: boolean; deletedCounts: Record<string, number>; error?: string }> {
+  try {
+    const supabase = getSupabaseClient();
+    const deletedCounts: Record<string, number> = {};
+    
+    // Delete in order that respects foreign key constraints
+    // 1. Delete journal_tags first (has foreign keys to both journals and tags)
+    const { data: journalTagsData, error: journalTagsError } = await supabase
+      .from('journal_tags')
+      .delete()
+      .neq('journal_id', -1); // Delete all records (using condition to avoid needing to specify all)
+    
+    if (journalTagsError && journalTagsError.code !== 'PGRST116') { // PGRST116 = no rows found (acceptable)
+      throw new Error(`Failed to delete journal_tags: ${journalTagsError.message}`);
+    }
+    
+    // Count before deletion
+    const { count: journalTagsCount } = await supabase
+      .from('journal_tags')
+      .select('*', { count: 'exact', head: true });
+    deletedCounts.journal_tags = journalTagsCount || 0;
+    
+    // 2. Delete journals (has foreign key to folders)
+    const { count: journalsCount } = await supabase
+      .from('journals')
+      .select('*', { count: 'exact', head: true });
+    
+    const { error: journalsError } = await supabase
+      .from('journals')
+      .delete()
+      .neq('id', -1);
+    
+    if (journalsError && journalsError.code !== 'PGRST116') {
+      throw new Error(`Failed to delete journals: ${journalsError.message}`);
+    }
+    deletedCounts.journals = journalsCount || 0;
+    
+    // 3. Delete tags
+    const { count: tagsCount } = await supabase
+      .from('tags')
+      .select('*', { count: 'exact', head: true });
+    
+    const { error: tagsError } = await supabase
+      .from('tags')
+      .delete()
+      .neq('id', -1);
+    
+    if (tagsError && tagsError.code !== 'PGRST116') {
+      throw new Error(`Failed to delete tags: ${tagsError.message}`);
+    }
+    deletedCounts.tags = tagsCount || 0;
+    
+    // 4. Delete folders last
+    const { count: foldersCount } = await supabase
+      .from('folders')
+      .select('*', { count: 'exact', head: true });
+    
+    const { error: foldersError } = await supabase
+      .from('folders')
+      .delete()
+      .neq('id', -1);
+    
+    if (foldersError && foldersError.code !== 'PGRST116') {
+      throw new Error(`Failed to delete folders: ${foldersError.message}`);
+    }
+    deletedCounts.folders = foldersCount || 0;
+    
+    return {
+      success: true,
+      deletedCounts
+    };
+  } catch (error) {
+    console.error('Database wipe error:', error);
+    return {
+      success: false,
+      deletedCounts: {},
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}

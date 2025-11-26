@@ -8,7 +8,7 @@ import {
   deleteRecord,
   getTableSchema
 } from "@/utils/supabaseClient";
-import { Database, Table, Plus, Edit, Trash2, RefreshCw, Search } from "lucide-react";
+import { Database, Table, Plus, Edit, Trash2, RefreshCw, Search, AlertTriangle } from "lucide-react";
 
 type TableName = 'journals' | 'folders' | 'tags' | 'journal_tags';
 
@@ -56,8 +56,11 @@ const DatabaseAdminPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showWipeModal, setShowWipeModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
+  const [wipeEncryptionKey, setWipeEncryptionKey] = useState("");
+  const [wipeLoading, setWipeLoading] = useState(false);
 
   useEffect(() => {
     fetchRecords();
@@ -132,6 +135,46 @@ const DatabaseAdminPage: React.FC = () => {
   const openDeleteModal = (record: any) => {
     setSelectedRecord(record);
     setShowDeleteModal(true);
+  };
+
+  const handleDatabaseWipe = async () => {
+    if (!wipeEncryptionKey) {
+      setError("Please enter the encryption key");
+      return;
+    }
+
+    setWipeLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/wipe-database', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ encryptionKey: wipeEncryptionKey }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccessMessage(
+          `Database wiped successfully! Deleted: ${Object.entries(data.deletedCounts || {})
+            .map(([table, count]) => `${table}: ${count}`)
+            .join(', ')}`
+        );
+        setShowWipeModal(false);
+        setWipeEncryptionKey("");
+        fetchRecords();
+        setTimeout(() => setSuccessMessage(null), 5000);
+      } else {
+        setError(data.error || 'Failed to wipe database');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to wipe database');
+    } finally {
+      setWipeLoading(false);
+    }
   };
 
   const filteredRecords = records.filter(record => {
@@ -323,6 +366,26 @@ const DatabaseAdminPage: React.FC = () => {
           ))}
         </div>
 
+        {/* Danger Zone - Database Wipe */}
+        <div className="bg-red-50 dark:bg-red-900/10 border-2 border-red-300 dark:border-red-800 rounded-lg p-6 mb-8">
+          <div className="flex items-start gap-4">
+            <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-1" />
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-red-900 dark:text-red-300 mb-2">Danger Zone</h2>
+              <p className="text-sm text-red-800 dark:text-red-400 mb-4">
+                Permanently delete all data from the database. This action cannot be undone and requires your encryption key for authentication.
+              </p>
+              <button
+                onClick={() => setShowWipeModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-semibold"
+              >
+                <Trash2 className="w-4 h-4" />
+                Wipe Entire Database
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Action Bar */}
         <div className="bg-card-background border border-border-color rounded-lg p-4 mb-4">
           <div className="flex flex-wrap gap-4 items-center justify-between">
@@ -505,6 +568,82 @@ const DatabaseAdminPage: React.FC = () => {
                     className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
                   >
                     Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Database Wipe Modal */}
+        {showWipeModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-900 border-2 border-red-500 rounded-lg max-w-lg w-full shadow-2xl">
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
+                  <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    ⚠️ CRITICAL WARNING
+                  </h2>
+                </div>
+                
+                <div className="bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 rounded-md p-4 mb-6">
+                  <p className="text-red-900 dark:text-red-300 font-semibold mb-2">
+                    You are about to permanently delete ALL data from your database:
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-red-800 dark:text-red-400 space-y-1">
+                    <li>All journal entries</li>
+                    <li>All folders</li>
+                    <li>All tags</li>
+                    <li>All journal-tag relationships</li>
+                  </ul>
+                  <p className="text-red-900 dark:text-red-300 font-bold mt-3">
+                    THIS ACTION CANNOT BE UNDONE!
+                  </p>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-2">
+                    Enter your encryption key to confirm:
+                  </label>
+                  <input
+                    type="password"
+                    value={wipeEncryptionKey}
+                    onChange={(e) => setWipeEncryptionKey(e.target.value)}
+                    placeholder="Paste your NEXT_PUBLIC_ENCRYPTION_KEY"
+                    className="w-full px-3 py-2 border-2 border-red-500 rounded-md bg-background font-mono text-sm"
+                    disabled={wipeLoading}
+                  />
+                  <p className="text-xs text-muted-color mt-2">
+                    Your encryption key can be found in your .env file
+                  </p>
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => {
+                      setShowWipeModal(false);
+                      setWipeEncryptionKey("");
+                      setError(null);
+                    }}
+                    className="px-4 py-2 border border-border-color rounded-md hover:bg-hover-background"
+                    disabled={wipeLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDatabaseWipe}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!wipeEncryptionKey || wipeLoading}
+                  >
+                    {wipeLoading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />
+                        Wiping Database...
+                      </>
+                    ) : (
+                      'Yes, Wipe Everything'
+                    )}
                   </button>
                 </div>
               </div>
