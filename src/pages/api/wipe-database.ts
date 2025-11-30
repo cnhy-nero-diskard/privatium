@@ -48,7 +48,9 @@ export default async function handler(
 
     // If authentication passes, proceed with database wipe
     console.log('⚠️  Database wipe initiated...');
-    const result = await wipeDatabase();
+    const headerUrl = req.headers['x-supabase-url'] as string | undefined;
+    const headerKey = req.headers['x-supabase-key'] as string | undefined;
+    const result = await wipeDatabase(headerUrl && headerKey ? { supabaseUrl: headerUrl, supabaseKey: headerKey } : undefined);
 
     if (result.success) {
       console.log('✅ Database wipe completed successfully');

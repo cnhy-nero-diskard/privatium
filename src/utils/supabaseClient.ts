@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { decrypt, encrypt, isEncryptedData, type EncryptedData } from './encryption';
 import { encodeMoodForDb, decodeMoodFromDb } from './moodUtils';
+import { getCredentialsFromMemory } from './credentialManager';
 
 interface Tag {
   id?: number;
@@ -28,6 +29,13 @@ interface EncryptedJournalEntry extends Omit<JournalEntry, 'title' | 'content' |
 }
 
 function getEncryptionKey(): string {
+  // Try to get from memory first (for runtime credentials)
+  const memoryCreds = getCredentialsFromMemory();
+  if (memoryCreds?.encryptionKey) {
+    return memoryCreds.encryptionKey;
+  }
+  
+  // Fall back to environment variables
   const key = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
   if (!key) {
     throw new Error('Missing encryption key');
@@ -35,7 +43,19 @@ function getEncryptionKey(): string {
   return key;
 }
 
-export function getSupabaseClient() {
+export function getSupabaseClient(overrides?: { supabaseUrl?: string; supabaseKey?: string }) {
+  // If explicit overrides are provided (e.g., API headers), prefer them
+  if (overrides?.supabaseUrl && overrides?.supabaseKey) {
+    return createClient(overrides.supabaseUrl, overrides.supabaseKey);
+  }
+
+  // Try to get from memory first (for runtime credentials)
+  const memoryCreds = getCredentialsFromMemory();
+  if (memoryCreds) {
+    return createClient(memoryCreds.supabaseUrl, memoryCreds.supabaseKey);
+  }
+  
+  // Fall back to environment variables
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY;
   
@@ -114,11 +134,14 @@ let lastData: JournalEntry[] | null = null;
  * @param options.offset - Offset for pagination
  * @returns Paginated journal entries with metadata
  */
-export async function getJournals(options?: { currentEtag?: string; limit?: number; offset?: number }) {
+export async function getJournals(
+  options?: { currentEtag?: string; limit?: number; offset?: number },
+  overrides?: { supabaseUrl?: string; supabaseKey?: string }
+) {
   const { currentEtag, limit, offset } = options || {};
   
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClient(overrides);
     
     // First, get the latest update timestamp from the journals table
     const { data: latestUpdate, error: timestampError } = await supabase
@@ -240,10 +263,11 @@ export async function searchJournals(
     tags?: string[];
     moods?: string[];
     date?: string | null;
-  }
+  },
+  overrides?: { supabaseUrl?: string; supabaseKey?: string }
 ) {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClient(overrides);
     
     // Fetch all journals (no pagination for search)
     const { data, error } = await supabase
@@ -314,8 +338,8 @@ export async function searchJournals(
   }
 }
 
-export async function getJournalById(id: number) {
-  const supabase = getSupabaseClient();
+export async function getJournalById(id: number, overrides?: { supabaseUrl?: string; supabaseKey?: string }) {
+  const supabase = getSupabaseClient(overrides);
   
   const { data, error } = await supabase
     .from('journals')
@@ -327,9 +351,9 @@ export async function getJournalById(id: number) {
   return data ? await decryptJournalData(data as EncryptedJournalEntry) : null;
 }
 
-export async function createJournal(journal: JournalEntry) {
+export async function createJournal(journal: JournalEntry, overrides?: { supabaseUrl?: string; supabaseKey?: string }) {
   console.log('Creating journal with mood:', journal.mood);
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClient(overrides);
   
   try {
     const encryptedJournal = await encryptJournalData(journal);
@@ -358,9 +382,9 @@ export async function createJournal(journal: JournalEntry) {
   }
 }
 
-export async function updateJournal(id: number, journal: Partial<JournalEntry>) {
+export async function updateJournal(id: number, journal: Partial<JournalEntry>, overrides?: { supabaseUrl?: string; supabaseKey?: string }) {
   console.log('Updating journal with mood:', journal.mood);
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClient(overrides);
   
   // If updating title, content, mood, or folder, encrypt them
   const updates: Partial<EncryptedJournalEntry> = { ...journal };
@@ -413,8 +437,8 @@ export async function updateJournal(id: number, journal: Partial<JournalEntry>) 
   return data[0] ? await decryptJournalData(data[0] as EncryptedJournalEntry) : null;
 }
 
-export async function deleteJournal(id: number) {
-  const supabase = getSupabaseClient();
+export async function deleteJournal(id: number, overrides?: { supabaseUrl?: string; supabaseKey?: string }) {
+  const supabase = getSupabaseClient(overrides);
   
   const { error } = await supabase
     .from('journals')
@@ -434,8 +458,8 @@ type TableName = 'journals' | 'folders' | 'tags' | 'journal_tags';
 /**
  * Get all records from a table
  */
-export async function getAllRecords(tableName: TableName): Promise<any[]> {
-  const supabase = getSupabaseClient();
+export async function getAllRecords(tableName: TableName, overrides?: { supabaseUrl?: string; supabaseKey?: string }): Promise<any[]> {
+  const supabase = getSupabaseClient(overrides);
   
   // For journal_tags, order by composite key instead of 'id'
   let query = supabase.from(tableName).select('*');
@@ -481,8 +505,8 @@ export async function getAllRecords(tableName: TableName): Promise<any[]> {
 /**
  * Create a new record in a table
  */
-export async function createRecord(tableName: TableName, record: any): Promise<any> {
-  const supabase = getSupabaseClient();
+export async function createRecord(tableName: TableName, record: any, overrides?: { supabaseUrl?: string; supabaseKey?: string }): Promise<any> {
+  const supabase = getSupabaseClient(overrides);
   
   // For journals, encrypt the data
   if (tableName === 'journals') {
@@ -517,8 +541,8 @@ export async function createRecord(tableName: TableName, record: any): Promise<a
 /**
  * Update a record in a table
  */
-export async function updateRecord(tableName: TableName, id: number, updates: any): Promise<any> {
-  const supabase = getSupabaseClient();
+export async function updateRecord(tableName: TableName, id: number, updates: any, overrides?: { supabaseUrl?: string; supabaseKey?: string }): Promise<any> {
+  const supabase = getSupabaseClient(overrides);
   
   // For journals, use the existing updateJournal function
   if (tableName === 'journals') {
@@ -548,8 +572,8 @@ export async function updateRecord(tableName: TableName, id: number, updates: an
 /**
  * Delete a record from a table
  */
-export async function deleteRecord(tableName: TableName, id: number | { journal_id: number; tag_id: number }): Promise<boolean> {
-  const supabase = getSupabaseClient();
+export async function deleteRecord(tableName: TableName, id: number | { journal_id: number; tag_id: number }, overrides?: { supabaseUrl?: string; supabaseKey?: string }): Promise<boolean> {
+  const supabase = getSupabaseClient(overrides);
   
   // For journal_tags, use composite key
   if (tableName === 'journal_tags' && typeof id === 'object') {
@@ -632,9 +656,9 @@ export async function getTableSchema(tableName: TableName): Promise<any> {
  * Wipe all data from the database (DESTRUCTIVE - use with caution)
  * This function deletes all data from all tables in the correct order to respect foreign key constraints
  */
-export async function wipeDatabase(): Promise<{ success: boolean; deletedCounts: Record<string, number>; error?: string }> {
+export async function wipeDatabase(overrides?: { supabaseUrl?: string; supabaseKey?: string }): Promise<{ success: boolean; deletedCounts: Record<string, number>; error?: string }> {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClient(overrides);
     const deletedCounts: Record<string, number> = {};
     
     // Delete in order that respects foreign key constraints

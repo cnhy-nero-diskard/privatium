@@ -1,8 +1,19 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { getCredentialsFromMemory } from '@/utils/credentialManager';
 
 // Groq API endpoint and key
 const GROQ_API_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+function getGroqApiKey(): string {
+  // Try to get from memory first (for runtime credentials)
+  const memoryCreds = getCredentialsFromMemory();
+  if (memoryCreds?.groqApiKey) {
+    return memoryCreds.groqApiKey;
+  }
+  
+  // Fall back to environment variable
+  return process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -16,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Invalid entries data' });
     }
 
+    const GROQ_API_KEY = getGroqApiKey();
     if (!GROQ_API_KEY) {
       return res.status(500).json({ message: 'API key not configured' });
     }

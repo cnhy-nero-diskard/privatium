@@ -1,10 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/utils/supabaseClient';
 import { decrypt, isEncryptedData, type EncryptedData } from '@/utils/encryption';
 import { decodeMoodFromDb } from '@/utils/moodUtils';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY;
 
 function getEncryptionKey(): string {
   const key = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
@@ -44,11 +42,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Start date and end date are required' });
     }
 
-    if (!supabaseUrl || !supabaseKey) {
-      return res.status(500).json({ message: 'Missing Supabase credentials' });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Allow credentials to be passed from client for testing (dev only)
+    const headerUrl = req.headers['x-supabase-url'] as string | undefined;
+    const headerKey = req.headers['x-supabase-key'] as string | undefined;
+    const supabase = getSupabaseClient(headerUrl && headerKey ? { supabaseUrl: headerUrl, supabaseKey: headerKey } : undefined);
 
     // Fetch entries within the date range
     let query = supabase

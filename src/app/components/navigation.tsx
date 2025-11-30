@@ -59,6 +59,12 @@ export function Navigation() {
           >
             Database Admin
           </Link>
+          <Link 
+            href="/settings" 
+            className="hover:text-accent-color transition-colors"
+          >
+            Settings
+          </Link>
           <button 
             onClick={toggleTheme}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-card-background hover:bg-accent-color hover:text-accent-foreground transition-colors"

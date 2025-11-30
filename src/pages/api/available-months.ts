@@ -1,8 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY;
+import { getSupabaseClient } from '@/utils/supabaseClient';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -10,11 +7,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (!supabaseUrl || !supabaseKey) {
-      return res.status(500).json({ message: 'Missing Supabase credentials' });
-    }
+    // Allow passing Supabase credentials in headers for non-server environments
+    // e.g., when simulating runtime credentials from a client
+    const headerUrl = req.headers['x-supabase-url'] as string | undefined;
+    const headerKey = req.headers['x-supabase-key'] as string | undefined;
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = getSupabaseClient(
+      headerUrl && headerKey ? { supabaseUrl: headerUrl, supabaseKey: headerKey } : undefined
+    );
 
     // Query to get distinct year-months from journal entries
     // We'll extract year-month from the date field and count entries
