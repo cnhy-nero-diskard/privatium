@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { BrainCircuit, Loader2 } from "lucide-react";
+import { createApiHeaders } from '@/utils/apiHelpers';
 
 interface Entry {
   id: number;
@@ -44,7 +45,7 @@ const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ startDate, endD
       // First, fetch the entries for the selected date range from the database
       const entriesResponse = await fetch('/api/entries-by-date', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: createApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ startDate, endDate, rangeType })
       });
 
@@ -75,7 +76,7 @@ const AITherapistSummary: React.FC<AITherapistSummaryProps> = ({ startDate, endD
       // Call the AI therapist API endpoint
       const response = await fetch('/api/ai-therapist', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: createApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ 
           entries: entriesForAI,
           month: '',

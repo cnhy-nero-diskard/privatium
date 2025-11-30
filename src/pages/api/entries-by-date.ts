@@ -2,9 +2,17 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getSupabaseClient } from '@/utils/supabaseClient';
 import { decrypt, isEncryptedData, type EncryptedData } from '@/utils/encryption';
 import { decodeMoodFromDb } from '@/utils/moodUtils';
+import { getCredentialsFromMemory } from '@/utils/credentialManager';
 
 
 function getEncryptionKey(): string {
+  // Try to get from memory first (for runtime credentials)
+  const memoryCreds = getCredentialsFromMemory();
+  if (memoryCreds?.encryptionKey) {
+    return memoryCreds.encryptionKey;
+  }
+  
+  // Fall back to environment variable
   const key = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
   if (!key) {
     throw new Error('Missing encryption key');

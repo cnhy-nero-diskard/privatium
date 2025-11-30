@@ -13,6 +13,7 @@ import FilterSidebar from "../components/FilterSidebar";
 import { getFolders, type Folder } from "@/utils/folderUtils";
 
 import { Tag } from '@/types/tags';
+import { getCredentialHeaders } from '@/utils/apiHelpers';
 
 interface ApiResponse {
 	status: number;
@@ -223,7 +224,9 @@ const HomePage: React.FC = () => {
 	// Load available months for AI therapist date selector
 	const loadAvailableMonths = async () => {
 		try {
-			const response = await fetch('/api/available-months');
+			const response = await fetch('/api/available-months', {
+				headers: getCredentialHeaders()
+			});
 			if (response.ok) {
 				const { months } = await response.json();
 				setAvailableMonths(months || []);

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { wipeDatabase } from '@/utils/supabaseClient';
+import { getCredentialsFromMemory } from '@/utils/credentialManager';
 
 type WipeResponse = {
   success: boolean;
@@ -28,8 +29,9 @@ export default async function handler(
       });
     }
 
-    // Verify the provided encryption key matches the environment variable
-    const actualEncryptionKey = process.env.NEXT_PUBLIC_ENCRYPTION_KEY;
+    // Get encryption key from memory or environment
+    const memoryCreds = getCredentialsFromMemory();
+    const actualEncryptionKey = memoryCreds?.encryptionKey || process.env.NEXT_PUBLIC_ENCRYPTION_KEY;
     
     if (!actualEncryptionKey) {
       return res.status(500).json({ 

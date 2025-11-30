@@ -9,6 +9,7 @@ import {
   getTableSchema
 } from "@/utils/supabaseClient";
 import { Database, Table, Plus, Edit, Trash2, RefreshCw, Search, AlertTriangle } from "lucide-react";
+import { createApiHeaders } from '@/utils/apiHelpers';
 
 type TableName = 'journals' | 'folders' | 'tags' | 'journal_tags';
 
@@ -149,9 +150,9 @@ const DatabaseAdminPage: React.FC = () => {
     try {
       const response = await fetch('/api/wipe-database', {
         method: 'POST',
-        headers: {
+        headers: createApiHeaders({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({ encryptionKey: wipeEncryptionKey }),
       });
 
