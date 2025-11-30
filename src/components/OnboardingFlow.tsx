@@ -123,6 +123,10 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       try {
         const credentials = await importCredentialsFile(selectedFile, importPassword);
         storeCredentialsInMemory(credentials, importPassword);
+        // Remember pseudo-path of chosen file so login screen knows onboarding completed
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('privatium_credentials_path', selectedFile.name);
+        }
         onComplete(credentials);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to import credentials');

@@ -4,8 +4,6 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { importCredentialsFile, storeCredentialsInMemory } from "@/utils/credentialManager";
 import type { EncryptedCredentialsFile } from "@/types/credentials";
-import OnboardingFlow from "@/components/OnboardingFlow";
-import type { PrivatiumCredentials } from "@/types/credentials";
 
 const LOCAL_STORAGE_KEY = "privatium_credentials_path";
 
@@ -15,7 +13,6 @@ export default function LoginPage() {
   const [filePath, setFilePath] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -70,14 +67,9 @@ export default function LoginPage() {
     }
   };
 
-  const handleOnboardingComplete = (credentials: PrivatiumCredentials) => {
-    setShowOnboarding(false);
-    router.replace("/home");
+  const goToOnboarding = () => {
+    router.push("/home");
   };
-
-  if (showOnboarding) {
-    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
-  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-slate-900 to-black text-gray-100 px-4">
@@ -148,14 +140,13 @@ export default function LoginPage() {
           <span>First time here?</span>
           <button
             type="button"
-            onClick={() => setShowOnboarding(true)}
+            onClick={goToOnboarding}
             className="text-sky-400 hover:text-sky-300 font-medium underline-offset-2 hover:underline"
           >
-            Start onboarding
+            Go to onboarding
           </button>
         </div>
       </div>
     </main>
   );
 }
-

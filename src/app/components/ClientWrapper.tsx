@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useCredentials } from '@/utils/credentialContext';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import CredentialExportModal from '@/components/CredentialExportModal';
@@ -9,6 +10,7 @@ import type { PrivatiumCredentials } from '@/types/credentials';
 
 export default function ClientWrapper({ children }: { children: React.ReactNode }) {
   const { needsOnboarding, isLoading, setCredentials } = useCredentials();
+  const pathname = usePathname();
   const [showExportModal, setShowExportModal] = useState(false);
   const [showExportReminder, setShowExportReminder] = useState(false);
 
@@ -38,7 +40,10 @@ export default function ClientWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  if (needsOnboarding) {
+  // Never overlay onboarding on the login page (root path), explicit login route, or home page
+  // Let the login page handle its own onboarding flow
+  // Exclude /home to allow post-login navigation without interference
+  if (needsOnboarding && pathname !== '/' && pathname !== '/login' && pathname !== '/home') {
     return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   }
 
