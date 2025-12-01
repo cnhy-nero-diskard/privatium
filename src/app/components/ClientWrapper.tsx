@@ -43,7 +43,9 @@ export default function ClientWrapper({ children }: { children: React.ReactNode 
   // Never overlay onboarding on the login page (root path), explicit login route, or home page
   // Let the login page handle its own onboarding flow
   // Exclude /home to allow post-login navigation without interference
-  if (needsOnboarding && pathname !== '/' && pathname !== '/login' && pathname !== '/home') {
+  // Also exclude /entryformui and /settings to allow navigation after credentials are set
+  const excludedPaths = ['/', '/login', '/home', '/entryformui', '/settings'];
+  if (needsOnboarding && pathname && !excludedPaths.includes(pathname)) {
     return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   }
 
