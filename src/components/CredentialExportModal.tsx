@@ -70,20 +70,18 @@ export default function CredentialExportModal({ isOpen, onClose }: CredentialExp
     setIsExporting(true);
 
     try {
-      // Get current credentials from memory or environment
+      // Get current credentials from memory
       const memoryCreds = getCredentialsFromMemory();
       
-      const credentials: PrivatiumCredentials = memoryCreds || {
-        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_KEY || '',
-        encryptionKey: process.env.NEXT_PUBLIC_ENCRYPTION_KEY || '',
-        groqApiKey: process.env.NEXT_PUBLIC_GROQ_API_KEY || '',
-        version: '1.0.0',
-        createdAt: new Date().toISOString()
-      };
+      if (!memoryCreds) {
+        setError('No credentials found to export. Please complete onboarding or import credentials first.');
+        return;
+      }
+      
+      const credentials: PrivatiumCredentials = memoryCreds;
 
       if (!credentials.supabaseUrl || !credentials.supabaseKey || !credentials.encryptionKey || !credentials.groqApiKey) {
-        setError('No credentials found to export. Please configure your environment first.');
+        setError('Incomplete credentials found. Please reconfigure your credentials.');
         return;
       }
 

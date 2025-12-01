@@ -5,7 +5,7 @@ import { MOOD_DEFINITIONS } from "@/utils/moodUtils";
 import { Tag } from "@/types/tags";
 import ExportButton from "@/components/ExportButton";
 import ImportButton from "@/components/ImportButton";
-import { getFolders, createFolder, deleteFolder, updateFolder, type Folder } from "@/utils/folderUtils";
+import { createFolder, deleteFolder, updateFolder, type Folder } from "@/utils/folderUtils";
 import { getTagsWithCounts } from "@/utils/tagUtils";
 
 interface JournalEntry {
@@ -111,13 +111,14 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Start collapsed by default
   
   // Folder management states
-  const [folders, setFolders] = useState<Folder[]>([]);
+  const [foldersWithCounts, setFoldersWithCounts] = useState<Array<{ folder: Folder; count: number }>>([]);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [newFolderColor, setNewFolderColor] = useState("#3B82F6");
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
   const [editFolderName, setEditFolderName] = useState("");
   const [editFolderColor, setEditFolderColor] = useState("#3B82F6");
+  const [loadingFolders, setLoadingFolders] = useState(false);
   
   // Tag management states
   const [tagsWithCounts, setTagsWithCounts] = useState<Array<{ tag: string; count: number }>>([]);
@@ -129,20 +130,25 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
     loadTags();
   }, []);
   
-  // Reload tags when entries change (e.g., after import, add, edit, or delete)
+  // Reload tags and folders when entries change (e.g., after import, add, edit, or delete)
   useEffect(() => {
-    // Only reload if we have entries loaded
-    if (entries.length > 0 || tagsWithCounts.length > 0) {
+    // Only reload if we have entries loaded or existing data
+    if (entries.length > 0 || tagsWithCounts.length > 0 || foldersWithCounts.length > 0) {
       loadTags();
+      loadFolders();
     }
   }, [entries.length]); // Only reload when the count changes to avoid unnecessary reloads
   
   const loadFolders = async () => {
     try {
-      const loadedFolders = await getFolders();
-      setFolders(loadedFolders);
+      setLoadingFolders(true);
+      const { getFoldersWithCounts } = await import('@/utils/folderUtils');
+      const folders = await getFoldersWithCounts();
+      setFoldersWithCounts(folders);
     } catch (error) {
       console.error("Failed to load folders:", error);
+    } finally {
+      setLoadingFolders(false);
     }
   };
   
@@ -210,17 +216,7 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
     setEditFolderColor(folder.color);
   };
 
-  // Calculate folder statistics
-  const folderStats = useMemo(() => {
-    const stats = entries.reduce((acc, entry) => {
-      acc[entry.folder] = (acc[entry.folder] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return Object.entries(stats)
-      .map(([folder, count]) => ({ folder, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [entries]);
+  // Folder stats are now loaded directly from the database via foldersWithCounts
 
   // Calculate mood statistics
   const moodStats = useMemo(() => {
@@ -407,7 +403,7 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
           }
           isOpen={isFoldersOpen}
           onToggle={() => setIsFoldersOpen(!isFoldersOpen)}
-          count={folders.length}
+          count={foldersWithCounts.length}
         >
           <div className="space-y-2">
             {/* Add folder button */}
@@ -479,13 +475,14 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
             
             {/* Folder list */}
             <div className="space-y-1">
-              {folders.length === 0 ? (
+              {loadingFolders ? (
+                <p className="text-sm text-gray-500 text-center py-4">Loading folders...</p>
+              ) : foldersWithCounts.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">
                   No folders yet
                 </p>
               ) : (
-                folders.map((folder) => {
-                  const entryCount = entries.filter((e) => e.folder === folder.name).length;
+                foldersWithCounts.map(({ folder, count: entryCount }) => {
                   const isSelected = selectedFolder === folder.name;
                   const isEditing = editingFolderId === folder.id;
                   

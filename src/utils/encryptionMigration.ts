@@ -5,8 +5,16 @@
 
 import { getSupabaseClient } from './supabaseClient';
 import { encrypt, isEncryptedData } from './encryption';
+import { getCredentialsFromMemory } from './credentialManager';
 
 function getEncryptionKey(): string {
+  // Try to get from memory first (for runtime credentials)
+  const memoryCreds = getCredentialsFromMemory();
+  if (memoryCreds?.encryptionKey) {
+    return memoryCreds.encryptionKey;
+  }
+  
+  // Fall back to environment variables
   const key = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
   if (!key) {
     throw new Error('Missing encryption key');

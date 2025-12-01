@@ -98,10 +98,15 @@ async function decryptJournalData(journal: EncryptedJournalEntry): Promise<Journ
       if (isEncryptedData(parsed)) {
         return await decrypt(parsed, key);
       }
-      // If it's not encrypted data but valid JSON, return as is
+      // If it's valid JSON but not encrypted data, it might be a legacy plain value
+      // wrapped in JSON quotes - unwrap it
+      if (typeof parsed === 'string') {
+        return parsed;
+      }
+      // Otherwise return the original field
       return field;
     } catch {
-      // If parsing fails, it might be plain text (legacy)
+      // If parsing fails, it's plain text (legacy data)
       return field;
     }
   };

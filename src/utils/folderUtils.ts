@@ -1,5 +1,6 @@
 import { getSupabaseClient } from './supabaseClient';
 import { decrypt, encrypt, isEncryptedData, type EncryptedData } from './encryption';
+import { getCredentialsFromMemory } from './credentialManager';
 
 export interface Folder {
   id: number;
@@ -15,6 +16,13 @@ interface EncryptedFolder extends Omit<Folder, 'name' | 'color'> {
 }
 
 function getEncryptionKey(): string {
+  // Try to get from memory first (for runtime credentials)
+  const memoryCreds = getCredentialsFromMemory();
+  if (memoryCreds?.encryptionKey) {
+    return memoryCreds.encryptionKey;
+  }
+  
+  // Fall back to environment variables
   const key = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
   if (!key) {
     throw new Error('Missing encryption key');
@@ -176,4 +184,67 @@ export async function deleteFolder(id: number): Promise<void> {
     console.error('Error deleting folder:', error);
     throw error;
   }
+}
+
+export async function getFoldersWithCounts(): Promise<Array<{ folder: Folder; count: number }>> {
+  const supabase = getSupabaseClient();
+  const key = getEncryptionKey();
+  
+  // Get all folders
+  const { data: foldersData, error: foldersError } = await supabase
+    .from('folders')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if (foldersError) throw foldersError;
+  if (!foldersData) return [];
+
+  // Get all journals with their folder names
+  const { data: journalsData, error: journalsError } = await supabase
+    .from('journals')
+    .select('folder');
+
+  if (journalsError) throw journalsError;
+
+  // Decrypt all folder names from journals
+  const decryptedJournalFolders = await Promise.all(
+    (journalsData || []).map(async (journal: any) => {
+      try {
+        const parsed = JSON.parse(journal.folder);
+        if (isEncryptedData(parsed)) {
+          return await decrypt(parsed, key);
+        }
+        // If it's valid JSON but not encrypted, unwrap it
+        if (typeof parsed === 'string') {
+          return parsed;
+        }
+        return journal.folder;
+      } catch {
+        // Plain text (legacy)
+        return journal.folder;
+      }
+    })
+  );
+
+  // Count occurrences of each folder name
+  const folderCounts = decryptedJournalFolders.reduce((acc, folderName) => {
+    acc[folderName] = (acc[folderName] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Decrypt folder data and attach counts
+  const foldersWithCounts = await Promise.all(
+    foldersData.map(async (folder: EncryptedFolder) => {
+      const decryptedFolder = await decryptFolderData(folder);
+      const count = folderCounts[decryptedFolder.name] || 0;
+      
+      return {
+        folder: decryptedFolder,
+        count: count
+      };
+    })
+  );
+
+  // Sort by count descending
+  return foldersWithCounts.sort((a, b) => b.count - a.count);
 }
